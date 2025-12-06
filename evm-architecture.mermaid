@@ -1,0 +1,62 @@
+---
+title: EVM プロジェクト管理ツール - システムアーキテクチャ
+---
+flowchart TB
+    subgraph Client["🖥️ クライアント層"]
+        Web["Web App\n(React + TypeScript)"]
+        Mobile["Mobile App\n(PWA対応)"]
+    end
+
+    subgraph Presentation["📊 プレゼンテーション層"]
+        Dashboard["ダッシュボード\n・EVMチャート\n・Sカーブ\n・KPIカード"]
+        WBS["WBS管理\n・ガントチャート\n・タスクツリー"]
+        Reports["レポート\n・PDF出力\n・Excel出力"]
+    end
+
+    subgraph API["⚡ API層"]
+        Gateway["API Gateway\n(認証・レート制限)"]
+        REST["REST API\n(NestJS / FastAPI)"]
+    end
+
+    subgraph Services["🔧 ビジネスロジック層"]
+        ProjectSvc["プロジェクト\nサービス"]
+        EVMCalc["EVM計算\nエンジン"]
+        TaskSvc["タスク管理\nサービス"]
+        CostSvc["コスト管理\nサービス"]
+        NotifySvc["通知\nサービス"]
+    end
+
+    subgraph Data["💾 データ層"]
+        PostgreSQL[("PostgreSQL\n・プロジェクト\n・タスク\n・コスト実績")]
+        Redis[("Redis\n・セッション\n・キャッシュ")]
+    end
+
+    subgraph External["🔗 外部連携"]
+        Auth["認証基盤\n(OAuth2/OIDC)"]
+        Storage["ファイル\nストレージ"]
+        Excel["Excel/CSV\nインポート"]
+    end
+
+    Web --> Gateway
+    Mobile --> Gateway
+    Gateway --> REST
+    REST --> ProjectSvc
+    REST --> EVMCalc
+    REST --> TaskSvc
+    REST --> CostSvc
+    REST --> NotifySvc
+    
+    ProjectSvc --> PostgreSQL
+    TaskSvc --> PostgreSQL
+    CostSvc --> PostgreSQL
+    EVMCalc --> PostgreSQL
+    EVMCalc --> Redis
+    NotifySvc --> Redis
+    
+    Gateway --> Auth
+    ProjectSvc --> Storage
+    TaskSvc --> Excel
+
+    Web --> Dashboard
+    Web --> WBS
+    Web --> Reports
