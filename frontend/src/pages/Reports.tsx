@@ -58,7 +58,7 @@ export function Reports() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">EVMレポート</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">EVMレポート</h2>
         {selectedProjectId && (
           <button
             onClick={() => createSnapshotMutation.mutate()}
@@ -72,14 +72,14 @@ export function Reports() {
       </div>
 
       {/* プロジェクト選択 */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           プロジェクト選択
         </label>
         <select
           value={selectedProjectId || ''}
           onChange={(e) => setSelectedProjectId(Number(e.target.value) || null)}
-          className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full md:w-64 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
         >
           <option value="">プロジェクトを選択...</option>
           {projects?.map((project) => (
@@ -134,30 +134,30 @@ export function Reports() {
 
               {/* 詳細指標 */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white rounded-lg shadow p-6">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                   <div className="flex items-center mb-2">
-                    <h3 className="text-sm font-medium text-gray-500">計画価値 (PV)</h3>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">計画価値 (PV)</h3>
                     <Tooltip content={evmTooltips.pv} />
                   </div>
-                  <p className="text-2xl font-bold text-blue-600">
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                     ¥{evmAnalysis.metrics.pv.toLocaleString()}
                   </p>
                 </div>
-                <div className="bg-white rounded-lg shadow p-6">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                   <div className="flex items-center mb-2">
-                    <h3 className="text-sm font-medium text-gray-500">出来高 (EV)</h3>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">出来高 (EV)</h3>
                     <Tooltip content={evmTooltips.ev} />
                   </div>
-                  <p className="text-2xl font-bold text-green-600">
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                     ¥{evmAnalysis.metrics.ev.toLocaleString()}
                   </p>
                 </div>
-                <div className="bg-white rounded-lg shadow p-6">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                   <div className="flex items-center mb-2">
-                    <h3 className="text-sm font-medium text-gray-500">実コスト (AC)</h3>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">実コスト (AC)</h3>
                     <Tooltip content={evmTooltips.ac} />
                   </div>
-                  <p className="text-2xl font-bold text-red-600">
+                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">
                     ¥{evmAnalysis.metrics.ac.toLocaleString()}
                   </p>
                 </div>
@@ -165,49 +165,49 @@ export function Reports() {
 
               {/* ステータスと予測 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">プロジェクト状況</h3>
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">プロジェクト状況</h3>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-600">スケジュール</span>
+                      <span className="text-gray-600 dark:text-gray-300">スケジュール</span>
                       <StatusBadge status={evmAnalysis.schedule_status.status} />
                     </div>
-                    <p className="text-sm text-gray-500">{evmAnalysis.schedule_status.message}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{evmAnalysis.schedule_status.message}</p>
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-600">コスト</span>
+                      <span className="text-gray-600 dark:text-gray-300">コスト</span>
                       <StatusBadge status={evmAnalysis.cost_status.status} />
                     </div>
-                    <p className="text-sm text-gray-500">{evmAnalysis.cost_status.message}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{evmAnalysis.cost_status.message}</p>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">完了時予測</h3>
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">完了時予測</h3>
                   <div className="space-y-4">
                     <div>
                       <div className="flex items-center">
-                        <span className="text-sm text-gray-500">BAC（総予算）</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">BAC（総予算）</span>
                         <Tooltip content={evmTooltips.bac} />
                       </div>
-                      <p className="text-xl font-bold text-gray-900">
+                      <p className="text-xl font-bold text-gray-900 dark:text-white">
                         ¥{evmAnalysis.metrics.bac.toLocaleString()}
                       </p>
                     </div>
                     <div>
                       <div className="flex items-center">
-                        <span className="text-sm text-gray-500">EAC（完了時総コスト見積）</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">EAC（完了時総コスト見積）</span>
                         <Tooltip content={evmTooltips.eac} />
                       </div>
-                      <p className="text-xl font-bold text-gray-900">
+                      <p className="text-xl font-bold text-gray-900 dark:text-white">
                         ¥{evmAnalysis.metrics.eac.toLocaleString()}
                       </p>
                     </div>
                     <div>
                       <div className="flex items-center">
-                        <span className="text-sm text-gray-500">ETC（残作業コスト見積）</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">ETC（残作業コスト見積）</span>
                         <Tooltip content={evmTooltips.etc} />
                       </div>
-                      <p className="text-xl font-bold text-gray-900">
+                      <p className="text-xl font-bold text-gray-900 dark:text-white">
                         ¥{evmAnalysis.metrics.etc.toLocaleString()}
                       </p>
                     </div>
@@ -216,22 +216,22 @@ export function Reports() {
               </div>
 
               {/* 推奨アクション */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">推奨アクション</h3>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">推奨アクション</h3>
                 <ul className="space-y-2">
                   {evmAnalysis.recommendations.map((rec, index) => (
                     <li key={index} className="flex items-start gap-2">
-                      <span className="text-blue-600 font-bold">•</span>
-                      <span className="text-gray-700">{rec}</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-bold">•</span>
+                      <span className="text-gray-700 dark:text-gray-300">{rec}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             </>
           ) : (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
               <BarChart3 className="w-12 h-12 mx-auto mb-4 text-yellow-400" />
-              <p className="text-yellow-800">
+              <p className="text-yellow-800 dark:text-yellow-200">
                 タスクを追加するとEVM指標が計算されます。
               </p>
             </div>
@@ -244,43 +244,43 @@ export function Reports() {
 
           {/* スナップショット履歴 */}
           {evmSnapshots && evmSnapshots.length > 0 && (
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">スナップショット履歴</h3>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">スナップショット履歴</h3>
               </div>
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">日付</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">PV</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">EV</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">AC</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SPI</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CPI</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">日付</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">PV</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">EV</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">AC</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">SPI</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">CPI</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {evmSnapshots.map((snapshot) => (
                     <tr key={snapshot.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {new Date(snapshot.date).toLocaleDateString('ja-JP')}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         ¥{snapshot.pv.toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         ¥{snapshot.ev.toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         ¥{snapshot.ac.toLocaleString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={snapshot.spi >= 1 ? 'text-green-600' : 'text-red-600'}>
+                        <span className={snapshot.spi >= 1 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
                           {snapshot.spi.toFixed(2)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={snapshot.cpi >= 1 ? 'text-green-600' : 'text-red-600'}>
+                        <span className={snapshot.cpi >= 1 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
                           {snapshot.cpi.toFixed(2)}
                         </span>
                       </td>

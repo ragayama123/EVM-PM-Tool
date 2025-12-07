@@ -37,20 +37,20 @@ export function KPICard({
   };
 
   const getStatusColor = (): string => {
-    if (!thresholds) return 'text-gray-900';
-    if (value >= thresholds.good) return 'text-green-600';
-    if (value >= thresholds.warning) return 'text-yellow-600';
-    return 'text-red-600';
+    if (!thresholds) return 'text-gray-900 dark:text-white';
+    if (value >= thresholds.good) return 'text-green-600 dark:text-green-400';
+    if (value >= thresholds.warning) return 'text-yellow-600 dark:text-yellow-400';
+    return 'text-red-600 dark:text-red-400';
   };
 
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
-  const trendColor = trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-gray-400';
+  const trendColor = trend === 'up' ? 'text-green-500 dark:text-green-400' : trend === 'down' ? 'text-red-500 dark:text-red-400' : 'text-gray-400';
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center">
-          <h3 className="text-sm font-medium text-gray-500">{title}</h3>
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</h3>
           {tooltip && <Tooltip content={tooltip} />}
         </div>
         {trend && <TrendIcon className={`w-5 h-5 ${trendColor}`} />}
@@ -59,7 +59,7 @@ export function KPICard({
         {formatValue(value)}
       </p>
       {description && (
-        <p className="mt-1 text-sm text-gray-500">{description}</p>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{description}</p>
       )}
     </div>
   );
