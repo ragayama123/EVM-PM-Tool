@@ -48,7 +48,28 @@ export const tasksApi = {
   },
 
   create: async (task: TaskCreate): Promise<Task> => {
-    const { data } = await api.post('/tasks/', task);
+    // 日付文字列をISO 8601形式に変換するヘルパー
+    const toDateTime = (dateStr: string | undefined): string | undefined => {
+      if (!dateStr) return undefined;
+      return `${dateStr}T00:00:00`;
+    };
+
+    const cleanedTask: Record<string, unknown> = {
+      name: task.name,
+      project_id: task.project_id,
+      parent_id: task.parent_id,
+      description: task.description,
+      planned_hours: task.planned_hours,
+      actual_hours: task.actual_hours,
+      hourly_rate: task.hourly_rate,
+    };
+    // 日付フィールドは空でなければISO形式で追加
+    if (task.planned_start_date) cleanedTask.planned_start_date = toDateTime(task.planned_start_date);
+    if (task.planned_end_date) cleanedTask.planned_end_date = toDateTime(task.planned_end_date);
+    if (task.actual_start_date) cleanedTask.actual_start_date = toDateTime(task.actual_start_date);
+    if (task.actual_end_date) cleanedTask.actual_end_date = toDateTime(task.actual_end_date);
+
+    const { data } = await api.post('/tasks/', cleanedTask);
     return data;
   },
 

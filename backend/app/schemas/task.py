@@ -8,9 +8,14 @@ class TaskBase(BaseModel):
     name: str
     description: Optional[str] = None
     planned_hours: float = 0
+    actual_hours: float = 0
     hourly_rate: float = 0
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    # 予定スケジュール
+    planned_start_date: Optional[datetime] = None
+    planned_end_date: Optional[datetime] = None
+    # 実績スケジュール
+    actual_start_date: Optional[datetime] = None
+    actual_end_date: Optional[datetime] = None
 
 
 class TaskCreate(TaskBase):
@@ -27,8 +32,10 @@ class TaskUpdate(BaseModel):
     actual_hours: Optional[float] = None
     progress: Optional[float] = Field(None, ge=0, le=100)
     hourly_rate: Optional[float] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    planned_start_date: Optional[datetime] = None
+    planned_end_date: Optional[datetime] = None
+    actual_start_date: Optional[datetime] = None
+    actual_end_date: Optional[datetime] = None
     parent_id: Optional[int] = None
 
 
@@ -37,7 +44,6 @@ class TaskResponse(TaskBase):
     id: int
     project_id: int
     parent_id: Optional[int] = None
-    actual_hours: float = 0
     progress: float = 0
     created_at: datetime
     updated_at: Optional[datetime] = None

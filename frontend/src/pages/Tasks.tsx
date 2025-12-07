@@ -12,7 +12,12 @@ export function Tasks() {
     name: '',
     description: '',
     planned_hours: 0,
+    actual_hours: 0,
     hourly_rate: 5000,
+    planned_start_date: '',
+    planned_end_date: '',
+    actual_start_date: '',
+    actual_end_date: '',
   });
 
   const { data: projects } = useQuery({
@@ -31,7 +36,17 @@ export function Tasks() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
       setShowForm(false);
-      setFormData({ name: '', description: '', planned_hours: 0, hourly_rate: 5000 });
+      setFormData({
+        name: '',
+        description: '',
+        planned_hours: 0,
+        actual_hours: 0,
+        hourly_rate: 5000,
+        planned_start_date: '',
+        planned_end_date: '',
+        actual_start_date: '',
+        actual_end_date: '',
+      });
     },
   });
 
@@ -103,7 +118,8 @@ export function Tasks() {
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">新規タスク</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 基本情報 */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   タスク名 *
@@ -118,17 +134,6 @@ export function Tasks() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  計画工数 (時間)
-                </label>
-                <input
-                  type="number"
-                  value={formData.planned_hours}
-                  onChange={(e) => setFormData({ ...formData, planned_hours: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
                   時間単価 (円/時)
                 </label>
                 <input
@@ -138,17 +143,97 @@ export function Tasks() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  説明
+                </label>
+                <input
+                  type="text"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                説明
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+
+            {/* 予定スケジュール */}
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">予定スケジュール</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    予定開始日
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.planned_start_date}
+                    onChange={(e) => setFormData({ ...formData, planned_start_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    予定終了日
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.planned_end_date}
+                    onChange={(e) => setFormData({ ...formData, planned_end_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    予定工数 (時間)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.planned_hours}
+                    onChange={(e) => setFormData({ ...formData, planned_hours: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 実績スケジュール */}
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">実績スケジュール</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    実績開始日
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.actual_start_date}
+                    onChange={(e) => setFormData({ ...formData, actual_start_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    実績終了日
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.actual_end_date}
+                    onChange={(e) => setFormData({ ...formData, actual_end_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    実績工数 (時間)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.actual_hours}
+                    onChange={(e) => setFormData({ ...formData, actual_hours: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
             </div>
             <div className="flex gap-2">
               <button
@@ -173,97 +258,127 @@ export function Tasks() {
       {/* タスク一覧 */}
       {selectedProjectId && (
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  タスク名
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  計画工数
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  実績工数
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  進捗率
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  計画価値
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {tasksLoading ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                    読み込み中...
-                  </td>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    タスク名
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    予定期間
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    実績期間
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    予定工数
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    実績工数
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    進捗率
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    計画価値
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    操作
+                  </th>
                 </tr>
-              ) : tasks && tasks.length > 0 ? (
-                tasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <ListTodo className="w-4 h-4 text-gray-400" />
-                        <span className="font-medium text-gray-900">{task.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {task.planned_hours}h
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {task.actual_hours}h
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={task.progress}
-                          onChange={(e) =>
-                            updateProgressMutation.mutate({
-                              id: task.id,
-                              progress: Number(e.target.value),
-                            })
-                          }
-                          className="w-20"
-                        />
-                        <span className="text-sm text-gray-500 w-12">
-                          {task.progress}%
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ¥{(task.planned_hours * task.hourly_rate).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <button
-                        onClick={() => {
-                          if (confirm('このタスクを削除しますか？')) {
-                            deleteMutation.mutate(task.id);
-                          }
-                        }}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {tasksLoading ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                      読み込み中...
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                    タスクがありません
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                ) : tasks && tasks.length > 0 ? (
+                  tasks.map((task) => (
+                    <tr key={task.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <ListTodo className="w-4 h-4 text-gray-400" />
+                          <span className="font-medium text-gray-900">{task.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {task.planned_start_date && task.planned_end_date ? (
+                          <div className="text-xs">
+                            <div>{new Date(task.planned_start_date).toLocaleDateString('ja-JP')}</div>
+                            <div className="text-gray-400">〜</div>
+                            <div>{new Date(task.planned_end_date).toLocaleDateString('ja-JP')}</div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {task.actual_start_date || task.actual_end_date ? (
+                          <div className="text-xs">
+                            <div>{task.actual_start_date ? new Date(task.actual_start_date).toLocaleDateString('ja-JP') : '-'}</div>
+                            <div className="text-gray-400">〜</div>
+                            <div>{task.actual_end_date ? new Date(task.actual_end_date).toLocaleDateString('ja-JP') : '-'}</div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {task.planned_hours}h
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {task.actual_hours}h
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={task.progress}
+                            onChange={(e) =>
+                              updateProgressMutation.mutate({
+                                id: task.id,
+                                progress: Number(e.target.value),
+                              })
+                            }
+                            className="w-20"
+                          />
+                          <span className="text-sm text-gray-500 w-12">
+                            {task.progress}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ¥{(task.planned_hours * task.hourly_rate).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <button
+                          onClick={() => {
+                            if (confirm('このタスクを削除しますか？')) {
+                              deleteMutation.mutate(task.id);
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                      タスクがありません
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

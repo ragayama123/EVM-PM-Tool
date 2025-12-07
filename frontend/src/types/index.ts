@@ -36,8 +36,12 @@ export interface Task {
   actual_hours: number;
   progress: number;
   hourly_rate: number;
-  start_date?: string;
-  end_date?: string;
+  // 予定スケジュール
+  planned_start_date?: string;
+  planned_end_date?: string;
+  // 実績スケジュール
+  actual_start_date?: string;
+  actual_end_date?: string;
   created_at: string;
   updated_at?: string;
   children?: Task[];
@@ -49,9 +53,12 @@ export interface TaskCreate {
   name: string;
   description?: string;
   planned_hours: number;
+  actual_hours?: number;
   hourly_rate: number;
-  start_date?: string;
-  end_date?: string;
+  planned_start_date?: string;
+  planned_end_date?: string;
+  actual_start_date?: string;
+  actual_end_date?: string;
 }
 
 // EVM指標

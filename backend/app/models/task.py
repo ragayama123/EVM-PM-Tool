@@ -24,9 +24,13 @@ class Task(Base):
     # 単価（時間あたりコスト）
     hourly_rate = Column(Float, nullable=False, default=0)
 
-    # スケジュール
-    start_date = Column(DateTime(timezone=True), nullable=True)
-    end_date = Column(DateTime(timezone=True), nullable=True)
+    # 予定スケジュール
+    planned_start_date = Column(DateTime(timezone=True), nullable=True)
+    planned_end_date = Column(DateTime(timezone=True), nullable=True)
+
+    # 実績スケジュール
+    actual_start_date = Column(DateTime(timezone=True), nullable=True)
+    actual_end_date = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
