@@ -74,7 +74,32 @@ export const tasksApi = {
   },
 
   update: async (id: number, task: Partial<TaskCreate & { actual_hours?: number; progress?: number }>): Promise<Task> => {
-    const { data } = await api.put(`/tasks/${id}`, task);
+    // 日付文字列をISO 8601形式に変換するヘルパー
+    const toDateTime = (dateStr: string | undefined | null): string | undefined => {
+      if (!dateStr) return undefined;
+      // すでにISO形式の場合はそのまま返す
+      if (dateStr.includes('T')) return dateStr;
+      return `${dateStr}T00:00:00`;
+    };
+
+    const cleanedTask: Record<string, unknown> = {};
+
+    // 非日付フィールド
+    if (task.name !== undefined) cleanedTask.name = task.name;
+    if (task.description !== undefined) cleanedTask.description = task.description;
+    if (task.planned_hours !== undefined) cleanedTask.planned_hours = task.planned_hours;
+    if (task.actual_hours !== undefined) cleanedTask.actual_hours = task.actual_hours;
+    if (task.hourly_rate !== undefined) cleanedTask.hourly_rate = task.hourly_rate;
+    if (task.progress !== undefined) cleanedTask.progress = task.progress;
+    if (task.parent_id !== undefined) cleanedTask.parent_id = task.parent_id;
+
+    // 日付フィールドは空でなければISO形式で追加
+    if (task.planned_start_date) cleanedTask.planned_start_date = toDateTime(task.planned_start_date);
+    if (task.planned_end_date) cleanedTask.planned_end_date = toDateTime(task.planned_end_date);
+    if (task.actual_start_date) cleanedTask.actual_start_date = toDateTime(task.actual_start_date);
+    if (task.actual_end_date) cleanedTask.actual_end_date = toDateTime(task.actual_end_date);
+
+    const { data } = await api.put(`/tasks/${id}`, cleanedTask);
     return data;
   },
 
