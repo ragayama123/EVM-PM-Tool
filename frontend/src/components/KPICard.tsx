@@ -1,10 +1,12 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Tooltip } from './Tooltip';
 
 interface KPICardProps {
   title: string;
   value: number;
   format?: 'number' | 'currency' | 'percent' | 'index';
   description?: string;
+  tooltip?: string;
   trend?: 'up' | 'down' | 'neutral';
   thresholds?: {
     good: number;
@@ -17,6 +19,7 @@ export function KPICard({
   value,
   format = 'number',
   description,
+  tooltip,
   trend,
   thresholds
 }: KPICardProps) {
@@ -46,7 +49,10 @@ export function KPICard({
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-gray-500">{title}</h3>
+        <div className="flex items-center">
+          <h3 className="text-sm font-medium text-gray-500">{title}</h3>
+          {tooltip && <Tooltip content={tooltip} />}
+        </div>
         {trend && <TrendIcon className={`w-5 h-5 ${trendColor}`} />}
       </div>
       <p className={`mt-2 text-3xl font-bold ${getStatusColor()}`}>

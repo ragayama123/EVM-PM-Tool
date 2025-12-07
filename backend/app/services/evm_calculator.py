@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 
@@ -20,25 +20,54 @@ class EVMCalculator:
         計画工数 × 単価の合計
         """
         if as_of_date is None:
-            as_of_date = datetime.now()
+            as_of_date = datetime.now(timezone.utc)
 
+        # タイムゾーンを取り除いてnaive datetimeにする（比較用）
+        if as_of_date.tzinfo is not None:
+            as_of_date = as_of_date.replace(tzinfo=None)
+
+        # 予定開始日が設定されているタスクを取得
         tasks = self.db.query(Task).filter(
-            Task.project_id == self.project_id,
-            Task.start_date <= as_of_date
+            Task.project_id == self.project_id
         ).all()
+
+        def to_naive(dt):
+            """タイムゾーン情報を取り除く"""
+            if dt is None:
+                return None
+            if dt.tzinfo is not None:
+                return dt.replace(tzinfo=None)
+            return dt
 
         pv = 0.0
         for task in tasks:
-            if task.end_date and task.end_date <= as_of_date:
+            # 予定日が設定されていない場合は計画価値全体を含める
+            if not task.planned_start_date:
+                pv += task.planned_hours * task.hourly_rate
+                continue
+
+            start = to_naive(task.planned_start_date)
+            end = to_naive(task.planned_end_date)
+
+            # 予定開始日がまだ来ていない場合はスキップ
+            if start > as_of_date:
+                continue
+
+            if end and end <= as_of_date:
                 # タスク完了予定日を過ぎている場合は100%
                 pv += task.planned_hours * task.hourly_rate
-            elif task.start_date and task.end_date:
+            elif start and end:
                 # 期間中の場合は日割り計算
-                total_days = (task.end_date - task.start_date).days
-                elapsed_days = (as_of_date - task.start_date).days
+                # +1 to include both start and end days in total
+                total_days = (end - start).days + 1
+                # +1 to include the current day as worked
+                elapsed_days = (as_of_date - start).days + 1
                 if total_days > 0:
                     ratio = min(elapsed_days / total_days, 1.0)
                     pv += task.planned_hours * task.hourly_rate * ratio
+            else:
+                # 終了日が設定されていない場合は全体を含める
+                pv += task.planned_hours * task.hourly_rate
 
         return pv
 
@@ -119,7 +148,7 @@ class EVMCalculator:
     def calculate_all(self, as_of_date: Optional[datetime] = None) -> dict:
         """全EVM指標を計算"""
         if as_of_date is None:
-            as_of_date = datetime.now()
+            as_of_date = datetime.now(timezone.utc)
 
         pv = self.calculate_pv(as_of_date)
         ev = self.calculate_ev()

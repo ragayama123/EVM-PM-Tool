@@ -4,7 +4,22 @@ import { projectsApi, evmApi } from '../api/client';
 import { EVMChart } from '../components/EVMChart';
 import { KPICard } from '../components/KPICard';
 import { StatusBadge } from '../components/StatusBadge';
+import { Tooltip } from '../components/Tooltip';
 import { BarChart3, Camera, RefreshCw } from 'lucide-react';
+
+// EVM用語の説明
+const evmTooltips = {
+  spi: 'Schedule Performance Index（スケジュール効率指数）= EV ÷ PV。1.0以上なら予定より進んでいる、1.0未満なら遅れている。',
+  cpi: 'Cost Performance Index（コスト効率指数）= EV ÷ AC。1.0以上なら予算内、1.0未満なら予算超過。',
+  sv: 'Schedule Variance（スケジュール差異）= EV - PV。正の値なら予定より進んでいる、負の値なら遅れている。',
+  cv: 'Cost Variance（コスト差異）= EV - AC。正の値なら予算内、負の値なら予算超過。',
+  pv: 'Planned Value（計画価値）。現時点までに完了しているはずの作業の計画コスト。',
+  ev: 'Earned Value（出来高）。実際に完了した作業の計画コスト。進捗率 × 計画価値で算出。',
+  ac: 'Actual Cost（実コスト）。実際に発生したコスト。実績工数 × 単価で算出。',
+  bac: 'Budget at Completion（完了時総予算）。プロジェクト全体の計画コスト。',
+  eac: 'Estimate at Completion（完了時総コスト見積）。現在のパフォーマンスで完了した場合の総コスト予測。',
+  etc: 'Estimate to Complete（残作業コスト見積）。残りの作業を完了するために必要なコスト予測。',
+};
 
 export function Reports() {
   const queryClient = useQueryClient();
@@ -89,6 +104,7 @@ export function Reports() {
                   title="SPI（スケジュール効率）"
                   value={evmAnalysis.metrics.spi}
                   format="index"
+                  tooltip={evmTooltips.spi}
                   thresholds={{ good: 1.0, warning: 0.9 }}
                   trend={evmAnalysis.metrics.spi >= 1 ? 'up' : 'down'}
                 />
@@ -96,6 +112,7 @@ export function Reports() {
                   title="CPI（コスト効率）"
                   value={evmAnalysis.metrics.cpi}
                   format="index"
+                  tooltip={evmTooltips.cpi}
                   thresholds={{ good: 1.0, warning: 0.9 }}
                   trend={evmAnalysis.metrics.cpi >= 1 ? 'up' : 'down'}
                 />
@@ -103,12 +120,14 @@ export function Reports() {
                   title="SV（スケジュール差異）"
                   value={evmAnalysis.metrics.sv}
                   format="currency"
+                  tooltip={evmTooltips.sv}
                   trend={evmAnalysis.metrics.sv >= 0 ? 'up' : 'down'}
                 />
                 <KPICard
                   title="CV（コスト差異）"
                   value={evmAnalysis.metrics.cv}
                   format="currency"
+                  tooltip={evmTooltips.cv}
                   trend={evmAnalysis.metrics.cv >= 0 ? 'up' : 'down'}
                 />
               </div>
@@ -116,19 +135,28 @@ export function Reports() {
               {/* 詳細指標 */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">計画価値 (PV)</h3>
+                  <div className="flex items-center mb-2">
+                    <h3 className="text-sm font-medium text-gray-500">計画価値 (PV)</h3>
+                    <Tooltip content={evmTooltips.pv} />
+                  </div>
                   <p className="text-2xl font-bold text-blue-600">
                     ¥{evmAnalysis.metrics.pv.toLocaleString()}
                   </p>
                 </div>
                 <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">出来高 (EV)</h3>
+                  <div className="flex items-center mb-2">
+                    <h3 className="text-sm font-medium text-gray-500">出来高 (EV)</h3>
+                    <Tooltip content={evmTooltips.ev} />
+                  </div>
                   <p className="text-2xl font-bold text-green-600">
                     ¥{evmAnalysis.metrics.ev.toLocaleString()}
                   </p>
                 </div>
                 <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">実コスト (AC)</h3>
+                  <div className="flex items-center mb-2">
+                    <h3 className="text-sm font-medium text-gray-500">実コスト (AC)</h3>
+                    <Tooltip content={evmTooltips.ac} />
+                  </div>
                   <p className="text-2xl font-bold text-red-600">
                     ¥{evmAnalysis.metrics.ac.toLocaleString()}
                   </p>
@@ -157,19 +185,28 @@ export function Reports() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">完了時予測</h3>
                   <div className="space-y-4">
                     <div>
-                      <span className="text-sm text-gray-500">BAC（総予算）</span>
+                      <div className="flex items-center">
+                        <span className="text-sm text-gray-500">BAC（総予算）</span>
+                        <Tooltip content={evmTooltips.bac} />
+                      </div>
                       <p className="text-xl font-bold text-gray-900">
                         ¥{evmAnalysis.metrics.bac.toLocaleString()}
                       </p>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-500">EAC（完了時総コスト見積）</span>
+                      <div className="flex items-center">
+                        <span className="text-sm text-gray-500">EAC（完了時総コスト見積）</span>
+                        <Tooltip content={evmTooltips.eac} />
+                      </div>
                       <p className="text-xl font-bold text-gray-900">
                         ¥{evmAnalysis.metrics.eac.toLocaleString()}
                       </p>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-500">ETC（残作業コスト見積）</span>
+                      <div className="flex items-center">
+                        <span className="text-sm text-gray-500">ETC（残作業コスト見積）</span>
+                        <Tooltip content={evmTooltips.etc} />
+                      </div>
                       <p className="text-xl font-bold text-gray-900">
                         ¥{evmAnalysis.metrics.etc.toLocaleString()}
                       </p>
