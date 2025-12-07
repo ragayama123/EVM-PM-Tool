@@ -1,0 +1,271 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { projectsApi, tasksApi } from '../api/client';
+import { ListTodo, Plus, Trash2 } from 'lucide-react';
+import type { TaskCreate } from '../types';
+
+export function Tasks() {
+  const queryClient = useQueryClient();
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState<Omit<TaskCreate, 'project_id'>>({
+    name: '',
+    description: '',
+    planned_hours: 0,
+    hourly_rate: 5000,
+  });
+
+  const { data: projects } = useQuery({
+    queryKey: ['projects'],
+    queryFn: projectsApi.getAll,
+  });
+
+  const { data: tasks, isLoading: tasksLoading } = useQuery({
+    queryKey: ['tasks', selectedProjectId],
+    queryFn: () => tasksApi.getByProject(selectedProjectId!),
+    enabled: !!selectedProjectId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: tasksApi.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
+      setShowForm(false);
+      setFormData({ name: '', description: '', planned_hours: 0, hourly_rate: 5000 });
+    },
+  });
+
+  const updateProgressMutation = useMutation({
+    mutationFn: ({ id, progress }: { id: number; progress: number }) =>
+      tasksApi.updateProgress(id, progress),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: tasksApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProjectId) return;
+    createMutation.mutate({
+      ...formData,
+      project_id: selectedProjectId,
+    });
+  };
+
+  // 最初のプロジェクトを自動選択
+  if (projects && projects.length > 0 && !selectedProjectId) {
+    setSelectedProjectId(projects[0].id);
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">タスク管理</h2>
+        {selectedProjectId && (
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            タスク追加
+          </button>
+        )}
+      </div>
+
+      {/* プロジェクト選択 */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          プロジェクト選択
+        </label>
+        <select
+          value={selectedProjectId || ''}
+          onChange={(e) => setSelectedProjectId(Number(e.target.value) || null)}
+          className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="">プロジェクトを選択...</option>
+          {projects?.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* タスク追加フォーム */}
+      {showForm && selectedProjectId && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">新規タスク</h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  タスク名 *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  計画工数 (時間)
+                </label>
+                <input
+                  type="number"
+                  value={formData.planned_hours}
+                  onChange={(e) => setFormData({ ...formData, planned_hours: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  時間単価 (円/時)
+                </label>
+                <input
+                  type="number"
+                  value={formData.hourly_rate}
+                  onChange={(e) => setFormData({ ...formData, hourly_rate: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                説明
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={createMutation.isPending}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {createMutation.isPending ? '追加中...' : '追加'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors"
+              >
+                キャンセル
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* タスク一覧 */}
+      {selectedProjectId && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  タスク名
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  計画工数
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  実績工数
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  進捗率
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  計画価値
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  操作
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {tasksLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    読み込み中...
+                  </td>
+                </tr>
+              ) : tasks && tasks.length > 0 ? (
+                tasks.map((task) => (
+                  <tr key={task.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <ListTodo className="w-4 h-4 text-gray-400" />
+                        <span className="font-medium text-gray-900">{task.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {task.planned_hours}h
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {task.actual_hours}h
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={task.progress}
+                          onChange={(e) =>
+                            updateProgressMutation.mutate({
+                              id: task.id,
+                              progress: Number(e.target.value),
+                            })
+                          }
+                          className="w-20"
+                        />
+                        <span className="text-sm text-gray-500 w-12">
+                          {task.progress}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      ¥{(task.planned_hours * task.hourly_rate).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <button
+                        onClick={() => {
+                          if (confirm('このタスクを削除しますか？')) {
+                            deleteMutation.mutate(task.id);
+                          }
+                        }}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    タスクがありません
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -29,17 +29,18 @@ EVMプロジェクト管理ツール - アーンドバリューマネジメン�
 │   │   │   ├── config.py       # アプリケーション設定
 │   │   │   └── database.py     # SQLAlchemy設定
 │   │   ├── models/             # SQLAlchemyモデル
-│   │   │   ├── project.py
-│   │   │   ├── task.py
-│   │   │   ├── cost.py
-│   │   │   ├── evm_snapshot.py
-│   │   │   └── user.py
 │   │   ├── schemas/            # Pydanticスキーマ
 │   │   ├── services/           # ビジネスロジック
 │   │   │   └── evm_calculator.py  # EVM計算エンジン
 │   │   └── main.py             # FastAPIアプリケーション
 │   └── requirements.txt
-├── frontend/                   # React フロントエンド（未実装）
+├── frontend/                   # React フロントエンド
+│   ├── src/
+│   │   ├── api/                # APIクライアント
+│   │   ├── components/         # 共通コンポーネント
+│   │   ├── pages/              # ページコンポーネント
+│   │   └── types/              # TypeScript型定義
+│   └── package.json
 ├── TASKS.md                    # タスク管理
 ├── CLAUDE.md                   # 本ファイル
 └── evm-architecture.*          # アーキテクチャ設計図
@@ -54,9 +55,18 @@ source .venv/bin/activate
 uvicorn app.main:app --reload
 ```
 
+### フロントエンド起動
+```bash
+cd frontend
+npm run dev
+```
+
 ### APIドキュメント
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
+
+### フロントエンド
+- 開発サーバー: http://localhost:5173
 
 ## 技術スタック
 
@@ -66,11 +76,14 @@ uvicorn app.main:app --reload
 - SQLAlchemy（SQLite）
 - Pydantic
 
-**フロントエンド（予定）:**
+**フロントエンド:**
 - React 18+ / TypeScript
 - Vite
 - TailwindCSS
+- React Query (@tanstack/react-query)
 - Recharts
+- React Router
+- Lucide Icons
 
 ## EVM指標
 
