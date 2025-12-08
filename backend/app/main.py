@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.api import projects, tasks, evm
+from app.api import projects, tasks, evm, members
 
 # データベーステーブルを作成
 Base.metadata.create_all(bind=engine)
@@ -30,6 +30,7 @@ app.add_middleware(
 app.include_router(projects.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(evm.router, prefix="/api")
+app.include_router(members.router, prefix="/api")
 
 
 @app.get("/")

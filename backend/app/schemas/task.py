@@ -22,6 +22,7 @@ class TaskCreate(TaskBase):
     """タスク作成スキーマ"""
     project_id: int
     parent_id: Optional[int] = None
+    assigned_member_id: Optional[int] = None
 
 
 class TaskUpdate(BaseModel):
@@ -37,6 +38,7 @@ class TaskUpdate(BaseModel):
     actual_start_date: Optional[datetime] = None
     actual_end_date: Optional[datetime] = None
     parent_id: Optional[int] = None
+    assigned_member_id: Optional[int] = None
 
 
 class TaskResponse(TaskBase):
@@ -44,6 +46,7 @@ class TaskResponse(TaskBase):
     id: int
     project_id: int
     parent_id: Optional[int] = None
+    assigned_member_id: Optional[int] = None
     progress: float = 0
     created_at: datetime
     updated_at: Optional[datetime] = None

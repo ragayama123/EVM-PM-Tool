@@ -6,6 +6,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Projects } from './pages/Projects';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Tasks } from './pages/Tasks';
+import { Members } from './pages/Members';
 import { Reports } from './pages/Reports';
 
 const queryClient = new QueryClient({
@@ -28,6 +29,7 @@ function App() {
               <Route path="projects" element={<Projects />} />
               <Route path="projects/:id" element={<ProjectDetail />} />
               <Route path="tasks" element={<Tasks />} />
+              <Route path="members" element={<Members />} />
               <Route path="reports" element={<Reports />} />
             </Route>
           </Routes>

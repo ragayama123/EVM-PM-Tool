@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis } from '../types';
+import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -58,6 +58,7 @@ export const tasksApi = {
       name: task.name,
       project_id: task.project_id,
       parent_id: task.parent_id,
+      assigned_member_id: task.assigned_member_id,
       description: task.description,
       planned_hours: task.planned_hours,
       actual_hours: task.actual_hours,
@@ -92,6 +93,7 @@ export const tasksApi = {
     if (task.hourly_rate !== undefined) cleanedTask.hourly_rate = task.hourly_rate;
     if (task.progress !== undefined) cleanedTask.progress = task.progress;
     if (task.parent_id !== undefined) cleanedTask.parent_id = task.parent_id;
+    if (task.assigned_member_id !== undefined) cleanedTask.assigned_member_id = task.assigned_member_id;
 
     // 日付フィールドは空でなければISO形式で追加
     if (task.planned_start_date) cleanedTask.planned_start_date = toDateTime(task.planned_start_date);
@@ -133,5 +135,32 @@ export const evmApi = {
   getAnalysis: async (projectId: number): Promise<EVMAnalysis> => {
     const { data } = await api.get(`/evm/projects/${projectId}/analysis`);
     return data;
+  },
+};
+
+// メンバーAPI
+export const membersApi = {
+  getByProject: async (projectId: number): Promise<MemberWithUtilization[]> => {
+    const { data } = await api.get(`/members/project/${projectId}`);
+    return data;
+  },
+
+  getById: async (id: number): Promise<Member> => {
+    const { data } = await api.get(`/members/${id}`);
+    return data;
+  },
+
+  create: async (member: MemberCreate): Promise<Member> => {
+    const { data } = await api.post('/members/', member);
+    return data;
+  },
+
+  update: async (id: number, member: Partial<MemberCreate>): Promise<Member> => {
+    const { data } = await api.put(`/members/${id}`, member);
+    return data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/members/${id}`);
   },
 };

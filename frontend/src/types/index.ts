@@ -25,11 +25,33 @@ export interface ProjectCreate {
   manager_id?: number;
 }
 
+// メンバー
+export interface Member {
+  id: number;
+  project_id: number;
+  name: string;
+  available_hours_per_week: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface MemberWithUtilization extends Member {
+  assigned_hours: number;
+  utilization_rate: number;
+}
+
+export interface MemberCreate {
+  project_id: number;
+  name: string;
+  available_hours_per_week?: number;
+}
+
 // タスク
 export interface Task {
   id: number;
   project_id: number;
   parent_id?: number;
+  assigned_member_id?: number;
   name: string;
   description?: string;
   planned_hours: number;
@@ -50,6 +72,7 @@ export interface Task {
 export interface TaskCreate {
   project_id: number;
   parent_id?: number;
+  assigned_member_id?: number;
   name: string;
   description?: string;
   planned_hours: number;

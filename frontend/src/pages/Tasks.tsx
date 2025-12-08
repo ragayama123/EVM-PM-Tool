@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { projectsApi, tasksApi } from '../api/client';
-import { ListTodo, Plus, Trash2, Pencil } from 'lucide-react';
+import { projectsApi, tasksApi, membersApi } from '../api/client';
+import { ListTodo, Plus, Trash2, Pencil, User } from 'lucide-react';
 import type { Task, TaskCreate } from '../types';
 
 // 日付文字列をYYYY-MM-DD形式に変換するヘルパー
@@ -25,6 +25,7 @@ export function Tasks() {
     planned_end_date: '',
     actual_start_date: '',
     actual_end_date: '',
+    assigned_member_id: undefined,
   });
 
   const { data: projects } = useQuery({
@@ -38,10 +39,17 @@ export function Tasks() {
     enabled: !!selectedProjectId,
   });
 
+  const { data: members } = useQuery({
+    queryKey: ['members', selectedProjectId],
+    queryFn: () => membersApi.getByProject(selectedProjectId!),
+    enabled: !!selectedProjectId,
+  });
+
   const createMutation = useMutation({
     mutationFn: tasksApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['members', selectedProjectId] });
       resetForm();
     },
   });
@@ -51,6 +59,7 @@ export function Tasks() {
       tasksApi.update(id, task),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['members', selectedProjectId] });
       resetForm();
     },
   });
@@ -68,6 +77,7 @@ export function Tasks() {
       planned_end_date: '',
       actual_start_date: '',
       actual_end_date: '',
+      assigned_member_id: undefined,
     });
   };
 
@@ -83,6 +93,7 @@ export function Tasks() {
     mutationFn: tasksApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['members', selectedProjectId] });
     },
   });
 
@@ -115,8 +126,16 @@ export function Tasks() {
       planned_end_date: toDateInput(task.planned_end_date),
       actual_start_date: toDateInput(task.actual_start_date),
       actual_end_date: toDateInput(task.actual_end_date),
+      assigned_member_id: task.assigned_member_id,
     });
     setShowForm(true);
+  };
+
+  // メンバーIDから名前を取得
+  const getMemberName = (memberId: number | undefined): string | null => {
+    if (!memberId || !members) return null;
+    const member = members.find(m => m.id === memberId);
+    return member ? member.name : null;
   };
 
   // 最初のプロジェクトを自動選択
@@ -173,7 +192,7 @@ export function Tasks() {
           </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* 基本情報 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   タスク名 *
@@ -185,6 +204,23 @@ export function Tasks() {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  担当者
+                </label>
+                <select
+                  value={formData.assigned_member_id || ''}
+                  onChange={(e) => setFormData({ ...formData, assigned_member_id: e.target.value ? Number(e.target.value) : undefined })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="">未割り当て</option>
+                  {members?.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -322,6 +358,9 @@ export function Tasks() {
                     タスク名
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    担当者
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     予定期間
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -347,7 +386,7 @@ export function Tasks() {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {tasksLoading ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                       読み込み中...
                     </td>
                   </tr>
@@ -359,6 +398,16 @@ export function Tasks() {
                           <ListTodo className="w-4 h-4 text-gray-400" />
                           <span className="font-medium text-gray-900 dark:text-white">{task.name}</span>
                         </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {getMemberName(task.assigned_member_id) ? (
+                          <div className="flex items-center gap-1">
+                            <User className="w-4 h-4 text-gray-400" />
+                            <span>{getMemberName(task.assigned_member_id)}</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 dark:text-gray-500">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {task.planned_start_date && task.planned_end_date ? (
@@ -437,7 +486,7 @@ export function Tasks() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                       タスクがありません
                     </td>
                   </tr>

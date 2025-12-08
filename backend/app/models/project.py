@@ -34,5 +34,6 @@ class Project(Base):
     # リレーション
     manager = relationship("User", back_populates="projects")
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+    members = relationship("Member", back_populates="project", cascade="all, delete-orphan")
     costs = relationship("Cost", back_populates="project", cascade="all, delete-orphan")
     evm_snapshots = relationship("EVMSnapshot", back_populates="project", cascade="all, delete-orphan")
