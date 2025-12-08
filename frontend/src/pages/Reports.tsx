@@ -5,7 +5,7 @@ import { EVMChart } from '../components/EVMChart';
 import { KPICard } from '../components/KPICard';
 import { StatusBadge } from '../components/StatusBadge';
 import { Tooltip } from '../components/Tooltip';
-import { BarChart3, Camera, RefreshCw } from 'lucide-react';
+import { BarChart3, Camera, RefreshCw, Download, FileText, FileJson, FileCode } from 'lucide-react';
 
 // EVM用語の説明（工数ベース）
 const evmTooltips = {
@@ -24,6 +24,8 @@ const evmTooltips = {
 export function Reports() {
   const queryClient = useQueryClient();
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -55,19 +57,94 @@ export function Reports() {
     setSelectedProjectId(projects[0].id);
   }
 
+  // エクスポート処理
+  const handleExport = async (format: 'markdown' | 'json' | 'yaml') => {
+    if (!selectedProjectId) return;
+
+    setExporting(true);
+    setShowExportMenu(false);
+
+    try {
+      const content = await evmApi.exportForLLM(selectedProjectId, format);
+
+      // ファイル拡張子を決定
+      const extensions = { markdown: 'md', json: 'json', yaml: 'yaml' };
+      const ext = extensions[format];
+
+      // プロジェクト名を取得
+      const project = projects?.find(p => p.id === selectedProjectId);
+      const fileName = `evm_report_${project?.name || 'project'}_${new Date().toISOString().split('T')[0]}.${ext}`;
+
+      // ダウンロード
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('エクスポートに失敗しました');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">EVMレポート</h2>
         {selectedProjectId && (
-          <button
-            onClick={() => createSnapshotMutation.mutate()}
-            disabled={createSnapshotMutation.isPending}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
-          >
-            <Camera className="w-4 h-4" />
-            {createSnapshotMutation.isPending ? '保存中...' : 'スナップショット保存'}
-          </button>
+          <div className="flex gap-2">
+            {/* エクスポートメニュー */}
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={exporting}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50"
+              >
+                <Download className="w-4 h-4" />
+                {exporting ? 'エクスポート中...' : 'LLM分析用エクスポート'}
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10">
+                  <button
+                    onClick={() => handleExport('markdown')}
+                    className="flex items-center gap-2 w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Markdown (.md)
+                  </button>
+                  <button
+                    onClick={() => handleExport('json')}
+                    className="flex items-center gap-2 w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <FileJson className="w-4 h-4" />
+                    JSON (.json)
+                  </button>
+                  <button
+                    onClick={() => handleExport('yaml')}
+                    className="flex items-center gap-2 w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg"
+                  >
+                    <FileCode className="w-4 h-4" />
+                    YAML (.yaml)
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => createSnapshotMutation.mutate()}
+              disabled={createSnapshotMutation.isPending}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              <Camera className="w-4 h-4" />
+              {createSnapshotMutation.isPending ? '保存中...' : 'スナップショット保存'}
+            </button>
+          </div>
         )}
       </div>
 

@@ -93,7 +93,7 @@ export interface TaskCreate {
   description?: string;
   planned_hours: number;
   actual_hours?: number;
-  hourly_rate: number;
+  hourly_rate?: number;
   planned_start_date?: string;
   planned_end_date?: string;
   actual_start_date?: string;
@@ -142,4 +142,44 @@ export interface EVMAnalysis {
     message: string;
   };
   recommendations: string[];
+}
+
+// 休日タイプ
+export type HolidayType = 'weekend' | 'national' | 'company' | 'custom';
+
+// 休日
+export interface Holiday {
+  id: number;
+  project_id: number;
+  date: string;
+  name: string;
+  holiday_type: HolidayType;
+}
+
+export interface HolidayCreate {
+  project_id: number;
+  date: string;
+  name: string;
+  holiday_type?: HolidayType;
+}
+
+export interface HolidayImportItem {
+  date: string;
+  name: string;
+  holiday_type?: HolidayType;
+}
+
+export interface HolidayGenerateRequest {
+  start_date: string;
+  end_date: string;
+  include_weekends: boolean;
+  include_national_holidays: boolean;
+}
+
+export interface WorkingDaysInfo {
+  start_date: string;
+  end_date: string;
+  total_days: number;
+  holiday_count: number;
+  working_days: number;
 }

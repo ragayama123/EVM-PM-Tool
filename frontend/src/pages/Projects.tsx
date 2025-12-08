@@ -96,10 +96,11 @@ export function Projects() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  予算 (円)
+                  計画総工数 (時間)
                 </label>
                 <input
                   type="number"
+                  step="0.5"
                   value={formData.budget}
                   onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -171,7 +172,7 @@ export function Projects() {
                 期間
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                予算
+                計画総工数
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 ステータス
@@ -201,7 +202,7 @@ export function Projects() {
                     {new Date(project.end_date).toLocaleDateString('ja-JP')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    ¥{project.budget.toLocaleString()}
+                    {project.budget.toLocaleString()}h
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge status={project.status} />

@@ -37,3 +37,4 @@ class Project(Base):
     members = relationship("Member", back_populates="project", cascade="all, delete-orphan")
     costs = relationship("Cost", back_populates="project", cascade="all, delete-orphan")
     evm_snapshots = relationship("EVMSnapshot", back_populates="project", cascade="all, delete-orphan")
+    holidays = relationship("Holiday", back_populates="project", cascade="all, delete-orphan")

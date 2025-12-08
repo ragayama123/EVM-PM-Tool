@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM } from '../types';
+import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM, Holiday, HolidayCreate, HolidayImportItem, HolidayGenerateRequest, WorkingDaysInfo, HolidayType } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -136,6 +136,14 @@ export const evmApi = {
     const { data } = await api.get(`/evm/projects/${projectId}/analysis`);
     return data;
   },
+
+  exportForLLM: async (projectId: number, format: 'markdown' | 'json' | 'yaml' = 'markdown'): Promise<string> => {
+    const { data } = await api.get(`/evm/projects/${projectId}/export`, {
+      params: { format },
+      responseType: 'text',
+    });
+    return data;
+  },
 };
 
 // メンバーAPI
@@ -166,6 +174,69 @@ export const membersApi = {
 
   getEvmByProject: async (projectId: number): Promise<MemberEVM[]> => {
     const { data } = await api.get(`/members/project/${projectId}/evm`);
+    return data;
+  },
+};
+
+// 休日API
+export const holidaysApi = {
+  getByProject: async (projectId: number, params?: { start_date?: string; end_date?: string; holiday_type?: HolidayType }): Promise<Holiday[]> => {
+    const { data } = await api.get(`/holidays/project/${projectId}`, { params });
+    return data;
+  },
+
+  getById: async (id: number): Promise<Holiday> => {
+    const { data } = await api.get(`/holidays/${id}`);
+    return data;
+  },
+
+  create: async (holiday: HolidayCreate): Promise<Holiday> => {
+    const { data } = await api.post('/holidays/', holiday);
+    return data;
+  },
+
+  update: async (id: number, holiday: { name?: string; holiday_type?: HolidayType }): Promise<Holiday> => {
+    const { data } = await api.put(`/holidays/${id}`, holiday);
+    return data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/holidays/${id}`);
+  },
+
+  deleteAll: async (projectId: number, holidayType?: HolidayType): Promise<{ message: string; deleted_count: number }> => {
+    const params = holidayType ? { holiday_type: holidayType } : {};
+    const { data } = await api.delete(`/holidays/project/${projectId}/all`, { params });
+    return data;
+  },
+
+  import: async (projectId: number, holidays: HolidayImportItem[], overwrite: boolean = false): Promise<Holiday[]> => {
+    const { data } = await api.post(`/holidays/project/${projectId}/import`, {
+      holidays,
+      overwrite,
+    });
+    return data;
+  },
+
+  importCsv: async (projectId: number, file: File, overwrite: boolean = false): Promise<{ message: string; created: number; updated: number; skipped: number; errors: string[] }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await api.post(`/holidays/project/${projectId}/import-csv`, formData, {
+      params: { overwrite },
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+
+  generate: async (projectId: number, request: HolidayGenerateRequest): Promise<Holiday[]> => {
+    const { data } = await api.post(`/holidays/project/${projectId}/generate`, request);
+    return data;
+  },
+
+  getWorkingDays: async (projectId: number, startDate: string, endDate: string): Promise<WorkingDaysInfo> => {
+    const { data } = await api.get(`/holidays/project/${projectId}/working-days`, {
+      params: { start_date: startDate, end_date: endDate },
+    });
     return data;
   },
 };

@@ -1,12 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { projectsApi, tasksApi, evmApi } from '../api/client';
 import { KPICard } from '../components/KPICard';
 import { EVMChart } from '../components/EVMChart';
 import { StatusBadge } from '../components/StatusBadge';
-import { ArrowLeft, Plus, Trash2, ListTodo, Camera } from 'lucide-react';
-import type { TaskCreate } from '../types';
+import { HolidayCalendar } from '../components/HolidayCalendar';
+import { ArrowLeft, Plus, Trash2, ListTodo, Camera, Edit2, X, Save } from 'lucide-react';
+import type { TaskCreate, ProjectCreate, ProjectStatus } from '../types';
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,8 @@ export function ProjectDetail() {
   const projectId = Number(id);
 
   const [showTaskForm, setShowTaskForm] = useState(false);
+  const [isEditingProject, setIsEditingProject] = useState(false);
+  const [projectFormData, setProjectFormData] = useState<Partial<ProjectCreate>>({});
   const [taskFormData, setTaskFormData] = useState<Omit<TaskCreate, 'project_id'>>({
     name: '',
     description: '',
@@ -100,6 +103,38 @@ export function ProjectDetail() {
     },
   });
 
+  const updateProjectMutation = useMutation({
+    mutationFn: (data: Partial<ProjectCreate>) => projectsApi.update(projectId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      setIsEditingProject(false);
+    },
+  });
+
+  // プロジェクトデータが読み込まれたらフォームを初期化
+  useEffect(() => {
+    if (project) {
+      setProjectFormData({
+        name: project.name,
+        description: project.description || '',
+        start_date: project.start_date.split('T')[0],
+        end_date: project.end_date.split('T')[0],
+        budget: project.budget,
+        status: project.status,
+      });
+    }
+  }, [project]);
+
+  const handleProjectSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateProjectMutation.mutate({
+      ...projectFormData,
+      start_date: projectFormData.start_date ? new Date(projectFormData.start_date).toISOString() : undefined,
+      end_date: projectFormData.end_date ? new Date(projectFormData.end_date).toISOString() : undefined,
+    });
+  };
+
   const handleTaskSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     createTaskMutation.mutate({
@@ -149,6 +184,13 @@ export function ProjectDetail() {
         </div>
         <div className="flex gap-2">
           <button
+            onClick={() => setIsEditingProject(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            <Edit2 className="w-4 h-4" />
+            編集
+          </button>
+          <button
             onClick={() => createSnapshotMutation.mutate()}
             disabled={createSnapshotMutation.isPending}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
@@ -170,12 +212,123 @@ export function ProjectDetail() {
         </div>
       </div>
 
+      {/* プロジェクト編集モーダル */}
+      {isEditingProject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">プロジェクト編集</h3>
+              <button
+                onClick={() => setIsEditingProject(false)}
+                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleProjectSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    プロジェクト名 *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={projectFormData.name || ''}
+                    onChange={(e) => setProjectFormData({ ...projectFormData, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    ステータス
+                  </label>
+                  <select
+                    value={projectFormData.status || 'planning'}
+                    onChange={(e) => setProjectFormData({ ...projectFormData, status: e.target.value as ProjectStatus })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="planning">計画中</option>
+                    <option value="in_progress">進行中</option>
+                    <option value="on_hold">保留中</option>
+                    <option value="completed">完了</option>
+                    <option value="cancelled">中止</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    開始日
+                  </label>
+                  <input
+                    type="date"
+                    value={projectFormData.start_date || ''}
+                    onChange={(e) => setProjectFormData({ ...projectFormData, start_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    終了日
+                  </label>
+                  <input
+                    type="date"
+                    value={projectFormData.end_date || ''}
+                    onChange={(e) => setProjectFormData({ ...projectFormData, end_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    計画総工数 (時間)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={projectFormData.budget || 0}
+                    onChange={(e) => setProjectFormData({ ...projectFormData, budget: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  説明
+                </label>
+                <textarea
+                  value={projectFormData.description || ''}
+                  onChange={(e) => setProjectFormData({ ...projectFormData, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingProject(false)}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  disabled={updateProjectMutation.isPending}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  {updateProjectMutation.isPending ? '保存中...' : '保存'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* プロジェクト情報 */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <span className="text-sm text-gray-500 dark:text-gray-400">予算</span>
-            <p className="text-xl font-bold text-gray-900 dark:text-white">¥{project.budget.toLocaleString()}</p>
+            <span className="text-sm text-gray-500 dark:text-gray-400">計画総工数</span>
+            <p className="text-xl font-bold text-gray-900 dark:text-white">{project.budget.toLocaleString()}h</p>
           </div>
           <div>
             <span className="text-sm text-gray-500 dark:text-gray-400">ステータス</span>
@@ -462,6 +615,13 @@ export function ProjectDetail() {
           </table>
         </div>
       </div>
+
+      {/* 休日カレンダー */}
+      <HolidayCalendar
+        projectId={projectId}
+        projectStartDate={project.start_date}
+        projectEndDate={project.end_date}
+      />
 
       {/* 推奨アクション */}
       {evmAnalysis && evmAnalysis.recommendations.length > 0 && (

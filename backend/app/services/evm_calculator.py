@@ -1,10 +1,11 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timezone, date, timedelta
+from typing import Optional, Set
 from sqlalchemy.orm import Session
 
 from app.models.project import Project
 from app.models.task import Task
 from app.models.evm_snapshot import EVMSnapshot
+from app.models.holiday import Holiday
 
 
 class EVMCalculator:
@@ -13,11 +14,44 @@ class EVMCalculator:
     def __init__(self, db: Session, project_id: int):
         self.db = db
         self.project_id = project_id
+        self._holiday_dates: Optional[Set[date]] = None
+
+    def _get_holiday_dates(self) -> Set[date]:
+        """プロジェクトの休日日付セットを取得（キャッシュ）"""
+        if self._holiday_dates is None:
+            holidays = self.db.query(Holiday.date).filter(
+                Holiday.project_id == self.project_id
+            ).all()
+            self._holiday_dates = {h[0] for h in holidays}
+        return self._holiday_dates
+
+    def _count_working_days(self, start_date: date, end_date: date) -> int:
+        """期間内の稼働日数を計算（休日を除外）"""
+        holiday_dates = self._get_holiday_dates()
+        working_days = 0
+        current = start_date
+        while current <= end_date:
+            if current not in holiday_dates:
+                working_days += 1
+            current += timedelta(days=1)
+        return working_days
+
+    def _count_elapsed_working_days(self, start_date: date, as_of_date: date) -> int:
+        """開始日から基準日までの経過稼働日数を計算（休日を除外）"""
+        holiday_dates = self._get_holiday_dates()
+        working_days = 0
+        current = start_date
+        while current <= as_of_date:
+            if current not in holiday_dates:
+                working_days += 1
+            current += timedelta(days=1)
+        return working_days
 
     def calculate_pv(self, as_of_date: Optional[datetime] = None) -> float:
         """
         PV（Planned Value / 計画価値）を計算
         計画工数の合計（工数ベース）
+        休日を除いた稼働日で日割り計算
         """
         if as_of_date is None:
             as_of_date = datetime.now(timezone.utc)
@@ -25,6 +59,8 @@ class EVMCalculator:
         # タイムゾーンを取り除いてnaive datetimeにする（比較用）
         if as_of_date.tzinfo is not None:
             as_of_date = as_of_date.replace(tzinfo=None)
+
+        as_of_date_only = as_of_date.date()
 
         # 予定開始日が設定されているタスクを取得
         tasks = self.db.query(Task).filter(
@@ -39,6 +75,14 @@ class EVMCalculator:
                 return dt.replace(tzinfo=None)
             return dt
 
+        def to_date(dt) -> Optional[date]:
+            """datetimeをdateに変換"""
+            if dt is None:
+                return None
+            if isinstance(dt, date) and not isinstance(dt, datetime):
+                return dt
+            return dt.date()
+
         pv = 0.0
         for task in tasks:
             # 予定日が設定されていない場合は計画工数全体を含める
@@ -46,24 +90,25 @@ class EVMCalculator:
                 pv += task.planned_hours
                 continue
 
-            start = to_naive(task.planned_start_date)
-            end = to_naive(task.planned_end_date)
+            start = to_date(to_naive(task.planned_start_date))
+            end = to_date(to_naive(task.planned_end_date))
 
             # 予定開始日がまだ来ていない場合はスキップ
-            if start > as_of_date:
+            if start > as_of_date_only:
                 continue
 
-            if end and end <= as_of_date:
+            if end and end <= as_of_date_only:
                 # タスク完了予定日を過ぎている場合は100%
                 pv += task.planned_hours
             elif start and end:
-                # 期間中の場合は日割り計算
-                # +1 to include both start and end days in total
-                total_days = (end - start).days + 1
-                # +1 to include the current day as worked
-                elapsed_days = (as_of_date - start).days + 1
-                if total_days > 0:
-                    ratio = min(elapsed_days / total_days, 1.0)
+                # 期間中の場合は稼働日ベースで日割り計算
+                total_working_days = self._count_working_days(start, end)
+                elapsed_working_days = self._count_elapsed_working_days(start, as_of_date_only)
+                # end日を超えないようにする
+                elapsed_working_days = min(elapsed_working_days, total_working_days)
+
+                if total_working_days > 0:
+                    ratio = elapsed_working_days / total_working_days
                     pv += task.planned_hours * ratio
             else:
                 # 終了日が設定されていない場合は全体を含める
