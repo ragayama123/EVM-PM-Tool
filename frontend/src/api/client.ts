@@ -117,13 +117,15 @@ export const tasksApi = {
 
 // EVM API
 export const evmApi = {
-  getMetrics: async (projectId: number): Promise<EVMMetrics> => {
-    const { data } = await api.get(`/evm/projects/${projectId}/metrics`);
+  getMetrics: async (projectId: number, asOfDate?: string): Promise<EVMMetrics> => {
+    const params = asOfDate ? { as_of_date: asOfDate } : {};
+    const { data } = await api.get(`/evm/projects/${projectId}/metrics`, { params });
     return data;
   },
 
-  createSnapshot: async (projectId: number): Promise<EVMSnapshot> => {
-    const { data } = await api.post(`/evm/projects/${projectId}/snapshots`);
+  createSnapshot: async (projectId: number, asOfDate?: string): Promise<EVMSnapshot> => {
+    const params = asOfDate ? { as_of_date: asOfDate } : {};
+    const { data } = await api.post(`/evm/projects/${projectId}/snapshots`, null, { params });
     return data;
   },
 

@@ -120,14 +120,14 @@ export function Dashboard() {
                     <div>
                       <p className="font-medium text-gray-900 dark:text-white">{project.name}</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {new Date(project.start_date).toLocaleDateString('ja-JP')} 〜{' '}
-                        {new Date(project.end_date).toLocaleDateString('ja-JP')}
+                        {project.start_date ? new Date(project.start_date).toLocaleDateString('ja-JP') : '-'} 〜{' '}
+                        {project.end_date ? new Date(project.end_date).toLocaleDateString('ja-JP') : '-'}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
-                      予算: ¥{project.budget.toLocaleString()}
+                      計画工数: {project.budget > 0 ? `${project.budget.toLocaleString()}h` : '-'}
                     </span>
                     <StatusBadge status={project.status} />
                   </div>

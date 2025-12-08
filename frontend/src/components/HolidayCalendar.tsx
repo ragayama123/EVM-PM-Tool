@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { holidaysApi } from '../api/client';
 import type { Holiday, HolidayType, HolidayGenerateRequest } from '../types';
-import { Calendar, Plus, Trash2, Upload, Wand2, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Plus, Trash2, Upload, Wand2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface HolidayCalendarProps {
   projectId: number;

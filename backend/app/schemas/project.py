@@ -9,9 +9,6 @@ class ProjectBase(BaseModel):
     """プロジェクト基本スキーマ"""
     name: str
     description: Optional[str] = None
-    start_date: datetime
-    end_date: datetime
-    budget: float = 0
     status: ProjectStatus = ProjectStatus.PLANNING
 
 
@@ -24,16 +21,19 @@ class ProjectUpdate(BaseModel):
     """プロジェクト更新スキーマ"""
     name: Optional[str] = None
     description: Optional[str] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    budget: Optional[float] = None
     status: Optional[ProjectStatus] = None
     manager_id: Optional[int] = None
 
 
-class ProjectResponse(ProjectBase):
-    """プロジェクトレスポンススキーマ"""
+class ProjectResponse(BaseModel):
+    """プロジェクトレスポンススキーマ（タスクから計算した値を含む）"""
     id: int
+    name: str
+    description: Optional[str] = None
+    start_date: Optional[datetime] = None  # タスクの最早開始日
+    end_date: Optional[datetime] = None    # タスクの最遅終了日
+    budget: float = 0                       # タスクの計画工数合計
+    status: ProjectStatus
     manager_id: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None

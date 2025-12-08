@@ -6,9 +6,9 @@ export interface Project {
   id: number;
   name: string;
   description?: string;
-  start_date: string;
-  end_date: string;
-  budget: number;
+  start_date?: string;  // タスクから自動計算
+  end_date?: string;    // タスクから自動計算
+  budget: number;       // タスクの計画工数合計
   status: ProjectStatus;
   manager_id?: number;
   created_at: string;
@@ -18,9 +18,6 @@ export interface Project {
 export interface ProjectCreate {
   name: string;
   description?: string;
-  start_date: string;
-  end_date: string;
-  budget: number;
   status?: ProjectStatus;
   manager_id?: number;
 }
