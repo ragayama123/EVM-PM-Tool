@@ -46,6 +46,22 @@ export interface MemberCreate {
   available_hours_per_week?: number;
 }
 
+export interface MemberEVM {
+  id: number;
+  name: string;
+  task_count: number;
+  bac: number;  // Budget at Completion
+  pv: number;   // Planned Value
+  ev: number;   // Earned Value
+  ac: number;   // Actual Cost
+  sv: number;   // Schedule Variance
+  cv: number;   // Cost Variance
+  spi: number;  // Schedule Performance Index
+  cpi: number;  // Cost Performance Index
+  etc: number;  // Estimate to Complete
+  eac: number;  // Estimate at Completion
+}
+
 // タスク
 export interface Task {
   id: number;

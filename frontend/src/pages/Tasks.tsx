@@ -15,7 +15,7 @@ export function Tasks() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [formData, setFormData] = useState<Omit<TaskCreate, 'project_id'>>({
+  const [formData, setFormData] = useState<Omit<TaskCreate, 'project_id'> & { progress: number }>({
     name: '',
     description: '',
     planned_hours: 0,
@@ -26,6 +26,7 @@ export function Tasks() {
     actual_start_date: '',
     actual_end_date: '',
     assigned_member_id: undefined,
+    progress: 0,
   });
 
   const { data: projects } = useQuery({
@@ -78,16 +79,9 @@ export function Tasks() {
       actual_start_date: '',
       actual_end_date: '',
       assigned_member_id: undefined,
+      progress: 0,
     });
   };
-
-  const updateProgressMutation = useMutation({
-    mutationFn: ({ id, progress }: { id: number; progress: number }) =>
-      tasksApi.updateProgress(id, progress),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
-    },
-  });
 
   const deleteMutation = useMutation({
     mutationFn: tasksApi.delete,
@@ -127,6 +121,7 @@ export function Tasks() {
       actual_start_date: toDateInput(task.actual_start_date),
       actual_end_date: toDateInput(task.actual_end_date),
       assigned_member_id: task.assigned_member_id,
+      progress: task.progress,
     });
     setShowForm(true);
   };
@@ -289,7 +284,7 @@ export function Tasks() {
             {/* 実績 */}
             <div className="border-t dark:border-gray-700 pt-4">
               <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">実績</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     実績開始日
@@ -322,6 +317,29 @@ export function Tasks() {
                     onChange={(e) => setFormData({ ...formData, actual_hours: Number(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    進捗率 (%)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={formData.progress}
+                      onChange={(e) => setFormData({ ...formData, progress: Number(e.target.value) })}
+                      className="flex-1"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={formData.progress}
+                      onChange={(e) => setFormData({ ...formData, progress: Math.min(100, Math.max(0, Number(e.target.value))) })}
+                      className="w-16 px-2 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-center"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -439,19 +457,16 @@ export function Tasks() {
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={task.progress}
-                            onChange={(e) =>
-                              updateProgressMutation.mutate({
-                                id: task.id,
-                                progress: Number(e.target.value),
-                              })
-                            }
-                            className="w-20"
-                          />
+                          <div className="w-20 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full ${
+                                task.progress >= 100 ? 'bg-green-500' :
+                                task.progress >= 50 ? 'bg-blue-500' :
+                                task.progress > 0 ? 'bg-yellow-500' : 'bg-gray-300'
+                              }`}
+                              style={{ width: `${Math.min(task.progress, 100)}%` }}
+                            />
+                          </div>
                           <span className="text-sm text-gray-500 dark:text-gray-400 w-12">
                             {task.progress}%
                           </span>

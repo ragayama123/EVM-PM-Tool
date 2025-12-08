@@ -38,3 +38,20 @@ class MemberWithUtilization(MemberResponse):
 
     class Config:
         from_attributes = True
+
+
+class MemberEVM(BaseModel):
+    """メンバー別EVMレスポンススキーマ"""
+    id: int
+    name: str
+    task_count: int = 0  # 担当タスク数
+    bac: float = 0  # Budget at Completion
+    pv: float = 0   # Planned Value
+    ev: float = 0   # Earned Value
+    ac: float = 0   # Actual Cost
+    sv: float = 0   # Schedule Variance
+    cv: float = 0   # Cost Variance
+    spi: float = 0  # Schedule Performance Index
+    cpi: float = 0  # Cost Performance Index
+    etc: float = 0  # Estimate to Complete
+    eac: float = 0  # Estimate at Completion

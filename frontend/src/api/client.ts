@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate } from '../types';
+import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -162,5 +162,10 @@ export const membersApi = {
 
   delete: async (id: number): Promise<void> => {
     await api.delete(`/members/${id}`);
+  },
+
+  getEvmByProject: async (projectId: number): Promise<MemberEVM[]> => {
+    const { data } = await api.get(`/members/project/${projectId}/evm`);
+    return data;
   },
 };

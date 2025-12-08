@@ -1,8 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { projectsApi, membersApi } from '../api/client';
-import { Users, Plus, Trash2, Pencil, AlertTriangle } from 'lucide-react';
+import { Users, Plus, Trash2, Pencil, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
+import { Tooltip } from '../components/Tooltip';
 import type { MemberCreate, MemberWithUtilization } from '../types';
+
+// EVM用語の説明
+const evmTooltips = {
+  bac: 'Budget at Completion（完了時総予算）。プロジェクト全体の計画コスト。',
+  pv: 'Planned Value（計画価値）。現時点までに完了しているはずの作業の計画コスト。',
+  ev: 'Earned Value（出来高）。実際に完了した作業の計画コスト。進捗率 × 計画価値で算出。',
+  ac: 'Actual Cost（実コスト）。実際に発生したコスト。実績工数 × 単価で算出。',
+  spi: 'Schedule Performance Index（スケジュール効率指数）= EV ÷ PV。1.0以上なら予定より進んでいる、1.0未満なら遅れている。',
+  cpi: 'Cost Performance Index（コスト効率指数）= EV ÷ AC。1.0以上なら予算内、1.0未満なら予算超過。',
+  eac: 'Estimate at Completion（完了時総コスト見積）。現在のパフォーマンスで完了した場合の総コスト予測。',
+};
 
 export function Members() {
   const queryClient = useQueryClient();
@@ -22,6 +34,12 @@ export function Members() {
   const { data: members, isLoading: membersLoading } = useQuery({
     queryKey: ['members', selectedProjectId],
     queryFn: () => membersApi.getByProject(selectedProjectId!),
+    enabled: !!selectedProjectId,
+  });
+
+  const { data: membersEvm, isLoading: evmLoading } = useQuery({
+    queryKey: ['members-evm', selectedProjectId],
+    queryFn: () => membersApi.getEvmByProject(selectedProjectId!),
     enabled: !!selectedProjectId,
   });
 
@@ -295,6 +313,127 @@ export function Members() {
                       >
                         最初のメンバーを追加する
                       </button>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* メンバー別EVM */}
+      {selectedProjectId && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">メンバー別EVM指標</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              各メンバーの担当タスクに基づくEVM（アーンドバリュー）分析
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    メンバー
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    タスク数
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip content={evmTooltips.bac} position="bottom">BAC</Tooltip>
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip content={evmTooltips.pv} position="bottom">PV</Tooltip>
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip content={evmTooltips.ev} position="bottom">EV</Tooltip>
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip content={evmTooltips.ac} position="bottom">AC</Tooltip>
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip content={evmTooltips.spi} position="bottom">SPI</Tooltip>
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip content={evmTooltips.cpi} position="bottom">CPI</Tooltip>
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <Tooltip content={evmTooltips.eac} position="bottom">EAC</Tooltip>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {evmLoading ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                      読み込み中...
+                    </td>
+                  </tr>
+                ) : membersEvm && membersEvm.length > 0 ? (
+                  membersEvm.map((memberEvm) => (
+                    <tr key={memberEvm.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {memberEvm.name}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400">
+                        {memberEvm.task_count}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-white">
+                        ¥{memberEvm.bac.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400">
+                        ¥{memberEvm.pv.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400">
+                        ¥{memberEvm.ev.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400">
+                        ¥{memberEvm.ac.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <span className={`text-sm font-medium ${
+                            memberEvm.spi >= 1 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                          }`}>
+                            {memberEvm.spi.toFixed(2)}
+                          </span>
+                          {memberEvm.spi >= 1 ? (
+                            <TrendingUp className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <TrendingDown className="w-4 h-4 text-red-500" />
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <span className={`text-sm font-medium ${
+                            memberEvm.cpi >= 1 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                          }`}>
+                            {memberEvm.cpi.toFixed(2)}
+                          </span>
+                          {memberEvm.cpi >= 1 ? (
+                            <TrendingUp className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <TrendingDown className="w-4 h-4 text-red-500" />
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm">
+                        <span className={memberEvm.eac > memberEvm.bac ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}>
+                          ¥{memberEvm.eac.toLocaleString()}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                      <Users className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                      <p>メンバーがいないか、タスクがアサインされていません</p>
                     </td>
                   </tr>
                 )}

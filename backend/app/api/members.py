@@ -1,4 +1,5 @@
 from typing import List
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
@@ -6,7 +7,7 @@ from sqlalchemy import func as sql_func
 from app.core.database import get_db
 from app.models.member import Member
 from app.models.task import Task
-from app.schemas.member import MemberCreate, MemberUpdate, MemberResponse, MemberWithUtilization
+from app.schemas.member import MemberCreate, MemberUpdate, MemberResponse, MemberWithUtilization, MemberEVM
 
 router = APIRouter(prefix="/members", tags=["members"])
 
@@ -92,3 +93,76 @@ def delete_member(member_id: int, db: Session = Depends(get_db)):
     db.delete(db_member)
     db.commit()
     return {"message": "メンバーを削除しました"}
+
+
+@router.get("/project/{project_id}/evm", response_model=List[MemberEVM])
+def get_members_evm(project_id: int, db: Session = Depends(get_db)):
+    """プロジェクトのメンバー別EVM指標を取得"""
+    members = db.query(Member).filter(Member.project_id == project_id).all()
+    as_of_date = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    result = []
+    for member in members:
+        # メンバーに割り当てられたタスクを取得
+        tasks = db.query(Task).filter(
+            Task.assigned_member_id == member.id
+        ).all()
+
+        # BAC: 計画価値合計
+        bac = sum(t.planned_hours * t.hourly_rate for t in tasks)
+
+        # PV: 計画価値（日割り計算）
+        pv = 0.0
+        for task in tasks:
+            if not task.planned_start_date:
+                pv += task.planned_hours * task.hourly_rate
+                continue
+
+            start = task.planned_start_date.replace(tzinfo=None) if task.planned_start_date.tzinfo else task.planned_start_date
+            end = task.planned_end_date.replace(tzinfo=None) if task.planned_end_date and task.planned_end_date.tzinfo else task.planned_end_date
+
+            if start > as_of_date:
+                continue
+
+            if end and end <= as_of_date:
+                pv += task.planned_hours * task.hourly_rate
+            elif start and end:
+                total_days = (end - start).days + 1
+                elapsed_days = (as_of_date - start).days + 1
+                if total_days > 0:
+                    ratio = min(elapsed_days / total_days, 1.0)
+                    pv += task.planned_hours * task.hourly_rate * ratio
+            else:
+                pv += task.planned_hours * task.hourly_rate
+
+        # EV: 出来高（進捗率加味）
+        ev = sum((t.planned_hours * t.hourly_rate) * (t.progress / 100.0) for t in tasks)
+
+        # AC: 実コスト
+        ac = sum(t.actual_hours * t.hourly_rate for t in tasks)
+
+        # 派生指標
+        sv = ev - pv
+        cv = ev - ac
+        spi = ev / pv if pv > 0 else 0.0
+        cpi = ev / ac if ac > 0 else 0.0
+        etc = (bac - ev) / cpi if cpi > 0 else 0.0
+        eac = ac + etc
+
+        result.append(MemberEVM(
+            id=member.id,
+            name=member.name,
+            task_count=len(tasks),
+            bac=round(bac, 0),
+            pv=round(pv, 0),
+            ev=round(ev, 0),
+            ac=round(ac, 0),
+            sv=round(sv, 0),
+            cv=round(cv, 0),
+            spi=round(spi, 2),
+            cpi=round(cpi, 2),
+            etc=round(etc, 0),
+            eac=round(eac, 0),
+        ))
+
+    return result
