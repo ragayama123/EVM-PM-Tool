@@ -27,9 +27,9 @@ export function EVMChart({ snapshots }: EVMChartProps) {
 
   if (data.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">EVM Sカーブ</h3>
-        <div className="h-64 flex items-center justify-center text-gray-500">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">EVM Sカーブ</h3>
+        <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
           データがありません
         </div>
       </div>
@@ -37,8 +37,8 @@ export function EVMChart({ snapshots }: EVMChartProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">EVM Sカーブ</h3>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">EVM Sカーブ</h3>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data}>
@@ -46,13 +46,13 @@ export function EVMChart({ snapshots }: EVMChartProps) {
             <XAxis dataKey="date" />
             <YAxis />
             <Tooltip
-              formatter={(value: number) => `¥${value.toLocaleString()}`}
+              formatter={(value: number) => `${value.toLocaleString()}h`}
             />
             <Legend />
             <Line
               type="monotone"
               dataKey="PV"
-              name="計画価値 (PV)"
+              name="計画工数 (PV)"
               stroke="#3B82F6"
               strokeWidth={2}
               dot={{ r: 4 }}
@@ -68,7 +68,7 @@ export function EVMChart({ snapshots }: EVMChartProps) {
             <Line
               type="monotone"
               dataKey="AC"
-              name="実コスト (AC)"
+              name="実績工数 (AC)"
               stroke="#EF4444"
               strokeWidth={2}
               dot={{ r: 4 }}

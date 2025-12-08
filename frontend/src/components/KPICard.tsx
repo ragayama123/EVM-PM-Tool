@@ -4,7 +4,7 @@ import { Tooltip } from './Tooltip';
 interface KPICardProps {
   title: string;
   value: number;
-  format?: 'number' | 'currency' | 'percent' | 'index';
+  format?: 'number' | 'currency' | 'percent' | 'index' | 'hours';
   description?: string;
   tooltip?: string;
   trend?: 'up' | 'down' | 'neutral';
@@ -27,6 +27,8 @@ export function KPICard({
     switch (format) {
       case 'currency':
         return `¥${val.toLocaleString()}`;
+      case 'hours':
+        return `${val.toLocaleString()}h`;
       case 'percent':
         return `${(val * 100).toFixed(1)}%`;
       case 'index':

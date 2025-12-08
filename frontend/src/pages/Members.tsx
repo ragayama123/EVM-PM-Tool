@@ -5,15 +5,15 @@ import { Users, Plus, Trash2, Pencil, AlertTriangle, TrendingUp, TrendingDown } 
 import { Tooltip } from '../components/Tooltip';
 import type { MemberCreate, MemberWithUtilization } from '../types';
 
-// EVM用語の説明
+// EVM用語の説明（工数ベース）
 const evmTooltips = {
-  bac: 'Budget at Completion（完了時総予算）。プロジェクト全体の計画コスト。',
-  pv: 'Planned Value（計画価値）。現時点までに完了しているはずの作業の計画コスト。',
-  ev: 'Earned Value（出来高）。実際に完了した作業の計画コスト。進捗率 × 計画価値で算出。',
-  ac: 'Actual Cost（実コスト）。実際に発生したコスト。実績工数 × 単価で算出。',
+  bac: 'Budget at Completion（計画総工数）。プロジェクト全体の計画工数。',
+  pv: 'Planned Value（計画工数）。現時点までに完了しているはずの作業の計画工数。',
+  ev: 'Earned Value（出来高）。実際に完了した作業の計画工数。進捗率 × 計画工数で算出。',
+  ac: 'Actual Cost（実績工数）。実際に投入した工数。',
   spi: 'Schedule Performance Index（スケジュール効率指数）= EV ÷ PV。1.0以上なら予定より進んでいる、1.0未満なら遅れている。',
-  cpi: 'Cost Performance Index（コスト効率指数）= EV ÷ AC。1.0以上なら予算内、1.0未満なら予算超過。',
-  eac: 'Estimate at Completion（完了時総コスト見積）。現在のパフォーマンスで完了した場合の総コスト予測。',
+  cpi: 'Cost Performance Index（工数効率指数）= EV ÷ AC。1.0以上なら効率的、1.0未満なら工数超過。',
+  eac: 'Estimate at Completion（完了時総工数見積）。現在のパフォーマンスで完了した場合の総工数予測。',
 };
 
 export function Members() {
@@ -383,16 +383,16 @@ export function Members() {
                         {memberEvm.task_count}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-white">
-                        ¥{memberEvm.bac.toLocaleString()}
+                        {memberEvm.bac}h
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400">
-                        ¥{memberEvm.pv.toLocaleString()}
+                        {memberEvm.pv}h
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400">
-                        ¥{memberEvm.ev.toLocaleString()}
+                        {memberEvm.ev}h
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400">
-                        ¥{memberEvm.ac.toLocaleString()}
+                        {memberEvm.ac}h
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -424,7 +424,7 @@ export function Members() {
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-right text-sm">
                         <span className={memberEvm.eac > memberEvm.bac ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}>
-                          ¥{memberEvm.eac.toLocaleString()}
+                          {memberEvm.eac}h
                         </span>
                       </td>
                     </tr>

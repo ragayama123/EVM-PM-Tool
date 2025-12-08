@@ -7,18 +7,18 @@ import { StatusBadge } from '../components/StatusBadge';
 import { Tooltip } from '../components/Tooltip';
 import { BarChart3, Camera, RefreshCw } from 'lucide-react';
 
-// EVM用語の説明
+// EVM用語の説明（工数ベース）
 const evmTooltips = {
   spi: 'Schedule Performance Index（スケジュール効率指数）= EV ÷ PV。1.0以上なら予定より進んでいる、1.0未満なら遅れている。',
-  cpi: 'Cost Performance Index（コスト効率指数）= EV ÷ AC。1.0以上なら予算内、1.0未満なら予算超過。',
+  cpi: 'Cost Performance Index（工数効率指数）= EV ÷ AC。1.0以上なら予定工数内、1.0未満なら工数超過。',
   sv: 'Schedule Variance（スケジュール差異）= EV - PV。正の値なら予定より進んでいる、負の値なら遅れている。',
-  cv: 'Cost Variance（コスト差異）= EV - AC。正の値なら予算内、負の値なら予算超過。',
-  pv: 'Planned Value（計画価値）。現時点までに完了しているはずの作業の計画コスト。',
-  ev: 'Earned Value（出来高）。実際に完了した作業の計画コスト。進捗率 × 計画価値で算出。',
-  ac: 'Actual Cost（実コスト）。実際に発生したコスト。実績工数 × 単価で算出。',
-  bac: 'Budget at Completion（完了時総予算）。プロジェクト全体の計画コスト。',
-  eac: 'Estimate at Completion（完了時総コスト見積）。現在のパフォーマンスで完了した場合の総コスト予測。',
-  etc: 'Estimate to Complete（残作業コスト見積）。残りの作業を完了するために必要なコスト予測。',
+  cv: 'Cost Variance（工数差異）= EV - AC。正の値なら予定工数内、負の値なら工数超過。',
+  pv: 'Planned Value（計画工数）。現時点までに完了しているはずの作業の計画工数。',
+  ev: 'Earned Value（出来高）。実際に完了した作業の計画工数。進捗率 × 計画工数で算出。',
+  ac: 'Actual Cost（実績工数）。実際に投入した工数。',
+  bac: 'Budget at Completion（計画総工数）。プロジェクト全体の計画工数。',
+  eac: 'Estimate at Completion（完了時総工数見積）。現在のパフォーマンスで完了した場合の総工数予測。',
+  etc: 'Estimate to Complete（残作業工数見積）。残りの作業を完了するために必要な工数予測。',
 };
 
 export function Reports() {
@@ -119,14 +119,14 @@ export function Reports() {
                 <KPICard
                   title="SV（スケジュール差異）"
                   value={evmAnalysis.metrics.sv}
-                  format="currency"
+                  format="hours"
                   tooltip={evmTooltips.sv}
                   trend={evmAnalysis.metrics.sv >= 0 ? 'up' : 'down'}
                 />
                 <KPICard
-                  title="CV（コスト差異）"
+                  title="CV（工数差異）"
                   value={evmAnalysis.metrics.cv}
-                  format="currency"
+                  format="hours"
                   tooltip={evmTooltips.cv}
                   trend={evmAnalysis.metrics.cv >= 0 ? 'up' : 'down'}
                 />
@@ -136,11 +136,11 @@ export function Reports() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                   <div className="flex items-center mb-2">
-                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">計画価値 (PV)</h3>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">計画工数 (PV)</h3>
                     <Tooltip content={evmTooltips.pv} />
                   </div>
                   <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    ¥{evmAnalysis.metrics.pv.toLocaleString()}
+                    {evmAnalysis.metrics.pv.toLocaleString()}h
                   </p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -149,16 +149,16 @@ export function Reports() {
                     <Tooltip content={evmTooltips.ev} />
                   </div>
                   <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    ¥{evmAnalysis.metrics.ev.toLocaleString()}
+                    {evmAnalysis.metrics.ev.toLocaleString()}h
                   </p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                   <div className="flex items-center mb-2">
-                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">実コスト (AC)</h3>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">実績工数 (AC)</h3>
                     <Tooltip content={evmTooltips.ac} />
                   </div>
                   <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                    ¥{evmAnalysis.metrics.ac.toLocaleString()}
+                    {evmAnalysis.metrics.ac.toLocaleString()}h
                   </p>
                 </div>
               </div>
@@ -186,29 +186,29 @@ export function Reports() {
                   <div className="space-y-4">
                     <div>
                       <div className="flex items-center">
-                        <span className="text-sm text-gray-500 dark:text-gray-400">BAC（総予算）</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">BAC（計画総工数）</span>
                         <Tooltip content={evmTooltips.bac} />
                       </div>
                       <p className="text-xl font-bold text-gray-900 dark:text-white">
-                        ¥{evmAnalysis.metrics.bac.toLocaleString()}
+                        {evmAnalysis.metrics.bac.toLocaleString()}h
                       </p>
                     </div>
                     <div>
                       <div className="flex items-center">
-                        <span className="text-sm text-gray-500 dark:text-gray-400">EAC（完了時総コスト見積）</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">EAC（完了時総工数見積）</span>
                         <Tooltip content={evmTooltips.eac} />
                       </div>
                       <p className="text-xl font-bold text-gray-900 dark:text-white">
-                        ¥{evmAnalysis.metrics.eac.toLocaleString()}
+                        {evmAnalysis.metrics.eac.toLocaleString()}h
                       </p>
                     </div>
                     <div>
                       <div className="flex items-center">
-                        <span className="text-sm text-gray-500 dark:text-gray-400">ETC（残作業コスト見積）</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">ETC（残作業工数見積）</span>
                         <Tooltip content={evmTooltips.etc} />
                       </div>
                       <p className="text-xl font-bold text-gray-900 dark:text-white">
-                        ¥{evmAnalysis.metrics.etc.toLocaleString()}
+                        {evmAnalysis.metrics.etc.toLocaleString()}h
                       </p>
                     </div>
                   </div>
@@ -266,13 +266,13 @@ export function Reports() {
                         {new Date(snapshot.date).toLocaleDateString('ja-JP')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        ¥{snapshot.pv.toLocaleString()}
+                        {snapshot.pv.toLocaleString()}h
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        ¥{snapshot.ev.toLocaleString()}
+                        {snapshot.ev.toLocaleString()}h
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        ¥{snapshot.ac.toLocaleString()}
+                        {snapshot.ac.toLocaleString()}h
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <span className={snapshot.spi >= 1 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>

@@ -97,7 +97,7 @@ def delete_member(member_id: int, db: Session = Depends(get_db)):
 
 @router.get("/project/{project_id}/evm", response_model=List[MemberEVM])
 def get_members_evm(project_id: int, db: Session = Depends(get_db)):
-    """プロジェクトのメンバー別EVM指標を取得"""
+    """プロジェクトのメンバー別EVM指標を取得（工数ベース）"""
     members = db.query(Member).filter(Member.project_id == project_id).all()
     as_of_date = datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -108,14 +108,14 @@ def get_members_evm(project_id: int, db: Session = Depends(get_db)):
             Task.assigned_member_id == member.id
         ).all()
 
-        # BAC: 計画価値合計
-        bac = sum(t.planned_hours * t.hourly_rate for t in tasks)
+        # BAC: 計画工数合計
+        bac = sum(t.planned_hours for t in tasks)
 
-        # PV: 計画価値（日割り計算）
+        # PV: 計画工数（日割り計算）
         pv = 0.0
         for task in tasks:
             if not task.planned_start_date:
-                pv += task.planned_hours * task.hourly_rate
+                pv += task.planned_hours
                 continue
 
             start = task.planned_start_date.replace(tzinfo=None) if task.planned_start_date.tzinfo else task.planned_start_date
@@ -125,21 +125,21 @@ def get_members_evm(project_id: int, db: Session = Depends(get_db)):
                 continue
 
             if end and end <= as_of_date:
-                pv += task.planned_hours * task.hourly_rate
+                pv += task.planned_hours
             elif start and end:
                 total_days = (end - start).days + 1
                 elapsed_days = (as_of_date - start).days + 1
                 if total_days > 0:
                     ratio = min(elapsed_days / total_days, 1.0)
-                    pv += task.planned_hours * task.hourly_rate * ratio
+                    pv += task.planned_hours * ratio
             else:
-                pv += task.planned_hours * task.hourly_rate
+                pv += task.planned_hours
 
         # EV: 出来高（進捗率加味）
-        ev = sum((t.planned_hours * t.hourly_rate) * (t.progress / 100.0) for t in tasks)
+        ev = sum(t.planned_hours * (t.progress / 100.0) for t in tasks)
 
-        # AC: 実コスト
-        ac = sum(t.actual_hours * t.hourly_rate for t in tasks)
+        # AC: 実績工数
+        ac = sum(t.actual_hours for t in tasks)
 
         # 派生指標
         sv = ev - pv
@@ -153,16 +153,16 @@ def get_members_evm(project_id: int, db: Session = Depends(get_db)):
             id=member.id,
             name=member.name,
             task_count=len(tasks),
-            bac=round(bac, 0),
-            pv=round(pv, 0),
-            ev=round(ev, 0),
-            ac=round(ac, 0),
-            sv=round(sv, 0),
-            cv=round(cv, 0),
+            bac=round(bac, 1),
+            pv=round(pv, 1),
+            ev=round(ev, 1),
+            ac=round(ac, 1),
+            sv=round(sv, 1),
+            cv=round(cv, 1),
             spi=round(spi, 2),
             cpi=round(cpi, 2),
-            etc=round(etc, 0),
-            eac=round(eac, 0),
+            etc=round(etc, 1),
+            eac=round(eac, 1),
         ))
 
     return result

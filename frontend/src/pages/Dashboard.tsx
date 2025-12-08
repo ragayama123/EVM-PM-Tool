@@ -6,12 +6,12 @@ import { EVMChart } from '../components/EVMChart';
 import { StatusBadge } from '../components/StatusBadge';
 import { FolderKanban, AlertCircle } from 'lucide-react';
 
-// EVM用語の説明
+// EVM用語の説明（工数ベース）
 const evmTooltips = {
   spi: 'Schedule Performance Index（スケジュール効率指数）= EV ÷ PV。1.0以上なら予定より進んでいる、1.0未満なら遅れている。',
-  cpi: 'Cost Performance Index（コスト効率指数）= EV ÷ AC。1.0以上なら予算内、1.0未満なら予算超過。',
-  ev: 'Earned Value（出来高）。実際に完了した作業の計画コスト。進捗率 × 計画価値で算出。',
-  eac: 'Estimate at Completion（完了時総コスト見積）。現在のパフォーマンスで完了した場合の総コスト予測。',
+  cpi: 'Cost Performance Index（工数効率指数）= EV ÷ AC。1.0以上なら予定工数内、1.0未満なら工数超過。',
+  ev: 'Earned Value（出来高）。実際に完了した作業の計画工数。進捗率 × 計画工数で算出。',
+  eac: 'Estimate at Completion（完了時総工数見積）。現在のパフォーマンスで完了した場合の総工数予測。',
 };
 
 export function Dashboard() {
@@ -71,13 +71,13 @@ export function Dashboard() {
           <KPICard
             title="EV（出来高）"
             value={evmAnalysis.metrics.ev}
-            format="currency"
+            format="hours"
             tooltip={evmTooltips.ev}
           />
           <KPICard
-            title="EAC（完了時総コスト見積）"
+            title="EAC（完了時総工数見積）"
             value={evmAnalysis.metrics.eac}
-            format="currency"
+            format="hours"
             tooltip={evmTooltips.eac}
           />
         </div>

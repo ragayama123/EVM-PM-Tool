@@ -187,7 +187,7 @@ export function Tasks() {
           </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* 基本情報 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   タスク名 *
@@ -216,17 +216,6 @@ export function Tasks() {
                     </option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  時間単価 (円/時)
-                </label>
-                <input
-                  type="number"
-                  value={formData.hourly_rate}
-                  onChange={(e) => setFormData({ ...formData, hourly_rate: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -393,9 +382,6 @@ export function Tasks() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     進捗率
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    計画価値
-                  </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     操作
                   </th>
@@ -404,7 +390,7 @@ export function Tasks() {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {tasksLoading ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                       読み込み中...
                     </td>
                   </tr>
@@ -472,9 +458,6 @@ export function Tasks() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        ¥{(task.planned_hours * task.hourly_rate).toLocaleString()}
-                      </td>
                       <td className="px-4 py-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
@@ -501,7 +484,7 @@ export function Tasks() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                       タスクがありません
                     </td>
                   </tr>

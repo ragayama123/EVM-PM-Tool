@@ -17,7 +17,7 @@ class EVMCalculator:
     def calculate_pv(self, as_of_date: Optional[datetime] = None) -> float:
         """
         PV（Planned Value / 計画価値）を計算
-        計画工数 × 単価の合計
+        計画工数の合計（工数ベース）
         """
         if as_of_date is None:
             as_of_date = datetime.now(timezone.utc)
@@ -41,9 +41,9 @@ class EVMCalculator:
 
         pv = 0.0
         for task in tasks:
-            # 予定日が設定されていない場合は計画価値全体を含める
+            # 予定日が設定されていない場合は計画工数全体を含める
             if not task.planned_start_date:
-                pv += task.planned_hours * task.hourly_rate
+                pv += task.planned_hours
                 continue
 
             start = to_naive(task.planned_start_date)
@@ -55,7 +55,7 @@ class EVMCalculator:
 
             if end and end <= as_of_date:
                 # タスク完了予定日を過ぎている場合は100%
-                pv += task.planned_hours * task.hourly_rate
+                pv += task.planned_hours
             elif start and end:
                 # 期間中の場合は日割り計算
                 # +1 to include both start and end days in total
@@ -64,17 +64,17 @@ class EVMCalculator:
                 elapsed_days = (as_of_date - start).days + 1
                 if total_days > 0:
                     ratio = min(elapsed_days / total_days, 1.0)
-                    pv += task.planned_hours * task.hourly_rate * ratio
+                    pv += task.planned_hours * ratio
             else:
                 # 終了日が設定されていない場合は全体を含める
-                pv += task.planned_hours * task.hourly_rate
+                pv += task.planned_hours
 
         return pv
 
     def calculate_ev(self) -> float:
         """
         EV（Earned Value / 出来高）を計算
-        完了タスクの計画価値合計（進捗率加味）
+        計画工数 × 進捗率の合計（工数ベース）
         """
         tasks = self.db.query(Task).filter(
             Task.project_id == self.project_id
@@ -82,16 +82,15 @@ class EVMCalculator:
 
         ev = 0.0
         for task in tasks:
-            # 計画価値 × 進捗率
-            planned_value = task.planned_hours * task.hourly_rate
-            ev += planned_value * (task.progress / 100.0)
+            # 計画工数 × 進捗率
+            ev += task.planned_hours * (task.progress / 100.0)
 
         return ev
 
     def calculate_ac(self) -> float:
         """
-        AC（Actual Cost / 実コスト）を計算
-        実績工数 × 単価の合計
+        AC（Actual Cost / 実績工数）を計算
+        実績工数の合計（工数ベース）
         """
         tasks = self.db.query(Task).filter(
             Task.project_id == self.project_id
@@ -99,7 +98,7 @@ class EVMCalculator:
 
         ac = 0.0
         for task in tasks:
-            ac += task.actual_hours * task.hourly_rate
+            ac += task.actual_hours
 
         return ac
 
@@ -134,14 +133,14 @@ class EVMCalculator:
         return (bac - ev) / cpi
 
     def get_bac(self) -> float:
-        """BAC（Budget at Completion / 完了時総予算）を取得"""
+        """BAC（Budget at Completion / 計画総工数）を取得"""
         tasks = self.db.query(Task).filter(
             Task.project_id == self.project_id
         ).all()
 
         bac = 0.0
         for task in tasks:
-            bac += task.planned_hours * task.hourly_rate
+            bac += task.planned_hours
 
         return bac
 
