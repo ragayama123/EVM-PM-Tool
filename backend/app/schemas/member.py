@@ -8,7 +8,8 @@ TASK_TYPES = [
     "requirements",      # 要件定義
     "external_design",   # 外部設計
     "detailed_design",   # 詳細設計
-    "development",       # PG/UT
+    "pg",                # PG（プログラミング）
+    "ut",                # UT（単体テスト）
     "ci",                # CI（結合テスト）
     "it",                # IT（統合テスト）
     "st",                # ST（システムテスト）
@@ -19,7 +20,8 @@ TASK_TYPE_LABELS = {
     "requirements": "要件定義",
     "external_design": "外部設計",
     "detailed_design": "詳細設計",
-    "development": "PG/UT",
+    "pg": "PG",
+    "ut": "UT",
     "ci": "CI",
     "it": "IT",
     "st": "ST",
