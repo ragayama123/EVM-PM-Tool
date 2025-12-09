@@ -10,6 +10,7 @@ class TaskBase(BaseModel):
     planned_hours: float = 0
     actual_hours: float = 0
     hourly_rate: float = 0
+    is_milestone: bool = False  # 固定日付タスク（リスケジュール対象外）
     # 予定スケジュール
     planned_start_date: Optional[datetime] = None
     planned_end_date: Optional[datetime] = None
@@ -33,6 +34,7 @@ class TaskUpdate(BaseModel):
     actual_hours: Optional[float] = None
     progress: Optional[float] = Field(None, ge=0, le=100)
     hourly_rate: Optional[float] = None
+    is_milestone: Optional[bool] = None  # 固定日付タスク
     planned_start_date: Optional[datetime] = None
     planned_end_date: Optional[datetime] = None
     actual_start_date: Optional[datetime] = None

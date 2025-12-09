@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { projectsApi, tasksApi, membersApi } from '../api/client';
-import { ListTodo, Plus, Trash2, Pencil, User, Calendar, X } from 'lucide-react';
+import { ListTodo, Plus, Trash2, Pencil, User, Calendar, X, Flag } from 'lucide-react';
 import type { Task, TaskCreate, ReschedulePreviewResponse } from '../types';
 
 // 日付文字列をYYYY-MM-DD形式に変換するヘルパー
@@ -15,7 +15,7 @@ export function Tasks() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [formData, setFormData] = useState<Omit<TaskCreate, 'project_id'> & { progress: number }>({
+  const [formData, setFormData] = useState<Omit<TaskCreate, 'project_id'> & { progress: number; is_milestone: boolean }>({
     name: '',
     description: '',
     planned_hours: 0,
@@ -27,6 +27,7 @@ export function Tasks() {
     actual_end_date: '',
     assigned_member_id: undefined,
     progress: 0,
+    is_milestone: false,
   });
 
   // リスケジュール関連のステート
@@ -88,6 +89,7 @@ export function Tasks() {
       actual_end_date: '',
       assigned_member_id: undefined,
       progress: 0,
+      is_milestone: false,
     });
   };
 
@@ -174,6 +176,7 @@ export function Tasks() {
       actual_end_date: toDateInput(task.actual_end_date),
       assigned_member_id: task.assigned_member_id,
       progress: task.progress,
+      is_milestone: task.is_milestone || false,
     });
     setShowForm(true);
   };
@@ -260,7 +263,8 @@ export function Tasks() {
           </h3>
           <p className="text-sm text-orange-700 dark:text-orange-300 mb-4">
             基準となるタスクを選択し、ずらす日数を指定してください。
-            選択したタスクより後の親タスク（とその子タスク）がすべてリスケジュールされます。
+            選択したタスクより後の親タスク（とその子タスク）がリスケジュールされます。
+            <span className="font-medium">固定日付タスクは対象外</span>です。
           </p>
 
           {rescheduleError && (
@@ -379,7 +383,7 @@ export function Tasks() {
             {/* 予定 */}
             <div className="border-t dark:border-gray-700 pt-4">
               <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">予定</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     予定開始日
@@ -412,6 +416,21 @@ export function Tasks() {
                     onChange={(e) => setFormData({ ...formData, planned_hours: Number(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    オプション
+                  </label>
+                  <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_milestone}
+                      onChange={(e) => setFormData({ ...formData, is_milestone: e.target.checked })}
+                      className="w-4 h-4 text-orange-600 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500"
+                    />
+                    <Flag className="w-4 h-4 text-orange-500" />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">固定日付（リスケ対象外）</span>
+                  </label>
                 </div>
               </div>
             </div>
@@ -545,22 +564,33 @@ export function Tasks() {
                     <tr
                       key={task.id}
                       onClick={() => {
-                        if (rescheduleMode && !task.parent_id && task.planned_start_date) {
+                        if (rescheduleMode && !task.parent_id && task.planned_start_date && !task.is_milestone) {
                           setSelectedTaskForReschedule(task);
                           setRescheduleError(null);
                         }
                       }}
                       className={`
                         hover:bg-gray-50 dark:hover:bg-gray-700
-                        ${rescheduleMode && !task.parent_id && task.planned_start_date ? 'cursor-pointer' : ''}
+                        ${rescheduleMode && !task.parent_id && task.planned_start_date && !task.is_milestone ? 'cursor-pointer' : ''}
                         ${selectedTaskForReschedule?.id === task.id ? 'bg-orange-100 dark:bg-orange-900/30' : ''}
-                        ${rescheduleMode && (task.parent_id || !task.planned_start_date) ? 'opacity-50' : ''}
+                        ${rescheduleMode && (task.parent_id || !task.planned_start_date || task.is_milestone) ? 'opacity-50' : ''}
                       `}
                     >
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <ListTodo className="w-4 h-4 text-gray-400" />
-                          <span className="font-medium text-gray-900 dark:text-white">{task.name}</span>
+                          {task.is_milestone ? (
+                            <Flag className="w-4 h-4 text-orange-500" />
+                          ) : (
+                            <ListTodo className="w-4 h-4 text-gray-400" />
+                          )}
+                          <span className={`font-medium ${task.is_milestone ? 'text-orange-600 dark:text-orange-400' : 'text-gray-900 dark:text-white'}`}>
+                            {task.name}
+                          </span>
+                          {task.is_milestone && (
+                            <span className="text-xs px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded">
+                              固定
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">

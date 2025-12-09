@@ -65,6 +65,7 @@ class RescheduleService:
 
         - base_taskのplanned_start_date以降の親タスクを対象
         - parent_id is None（親タスク）のみ
+        - is_milestone = True のタスクは除外（固定日付）
         - 予定開始日順でソート
         - base_task自身は除外
         """
@@ -79,12 +80,14 @@ class RescheduleService:
         # 親タスクのみを対象（parent_id is None）
         # base_taskの予定開始日以降のタスク
         # base_task自身は除外
+        # マイルストーン（固定日付）は除外
         return self.db.query(Task).filter(
             Task.project_id == self.project_id,
             Task.parent_id == None,  # noqa: E711
             Task.planned_start_date != None,  # noqa: E711
             Task.planned_start_date >= base_task.planned_start_date,
-            Task.id != base_task_id
+            Task.id != base_task_id,
+            Task.is_milestone == False  # noqa: E712
         ).order_by(Task.planned_start_date).all()
 
     def get_children(self, parent_id: int) -> List[Task]:

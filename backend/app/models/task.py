@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -24,6 +24,9 @@ class Task(Base):
 
     # 単価（時間あたりコスト）
     hourly_rate = Column(Float, nullable=False, default=0)
+
+    # マイルストーン（固定日付タスク - リスケジュール対象外）
+    is_milestone = Column(Boolean, nullable=False, default=False)
 
     # 予定スケジュール
     planned_start_date = Column(DateTime(timezone=True), nullable=True)

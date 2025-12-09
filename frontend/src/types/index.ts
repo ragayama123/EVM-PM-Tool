@@ -71,6 +71,7 @@ export interface Task {
   actual_hours: number;
   progress: number;
   hourly_rate: number;
+  is_milestone: boolean;  // 固定日付タスク（リスケジュール対象外）
   // 予定スケジュール
   planned_start_date?: string;
   planned_end_date?: string;
@@ -91,6 +92,7 @@ export interface TaskCreate {
   planned_hours: number;
   actual_hours?: number;
   hourly_rate?: number;
+  is_milestone?: boolean;  // 固定日付タスク
   planned_start_date?: string;
   planned_end_date?: string;
   actual_start_date?: string;

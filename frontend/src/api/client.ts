@@ -63,6 +63,7 @@ export const tasksApi = {
       planned_hours: task.planned_hours,
       actual_hours: task.actual_hours,
       hourly_rate: task.hourly_rate,
+      is_milestone: task.is_milestone ?? false,
     };
     // 日付フィールドは空でなければISO形式で追加
     if (task.planned_start_date) cleanedTask.planned_start_date = toDateTime(task.planned_start_date);
@@ -94,6 +95,7 @@ export const tasksApi = {
     if (task.progress !== undefined) cleanedTask.progress = task.progress;
     if (task.parent_id !== undefined) cleanedTask.parent_id = task.parent_id;
     if (task.assigned_member_id !== undefined) cleanedTask.assigned_member_id = task.assigned_member_id;
+    if ((task as { is_milestone?: boolean }).is_milestone !== undefined) cleanedTask.is_milestone = (task as { is_milestone?: boolean }).is_milestone;
 
     // 日付フィールドは空でなければISO形式で追加
     if (task.planned_start_date) cleanedTask.planned_start_date = toDateTime(task.planned_start_date);
