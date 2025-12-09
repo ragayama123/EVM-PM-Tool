@@ -6,6 +6,7 @@ import { KPICard } from '../components/KPICard';
 import { StatusBadge } from '../components/StatusBadge';
 import { Tooltip } from '../components/Tooltip';
 import { BarChart3, Camera, RefreshCw, Download, FileText, FileJson, FileCode } from 'lucide-react';
+import { useProject } from '../contexts/ProjectContext';
 
 // EVM用語の説明（工数ベース）
 const evmTooltips = {
@@ -23,7 +24,7 @@ const evmTooltips = {
 
 export function Reports() {
   const queryClient = useQueryClient();
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const { selectedProjectId, setSelectedProjectId } = useProject();
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
 

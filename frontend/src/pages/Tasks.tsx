@@ -4,6 +4,7 @@ import { projectsApi, tasksApi, membersApi } from '../api/client';
 import { ListTodo, Plus, Trash2, Pencil, User, Calendar, X, Flag, Zap } from 'lucide-react';
 import type { Task, TaskCreate, ReschedulePreviewResponse, AutoSchedulePreviewResponse } from '../types';
 import { TASK_TYPES, type TaskType } from '../types';
+import { useProject } from '../contexts/ProjectContext';
 
 // 日付文字列をYYYY-MM-DD形式に変換するヘルパー
 const toDateInput = (dateStr: string | undefined | null): string => {
@@ -13,7 +14,7 @@ const toDateInput = (dateStr: string | undefined | null): string => {
 
 export function Tasks() {
   const queryClient = useQueryClient();
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const { selectedProjectId, setSelectedProjectId } = useProject();
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [formData, setFormData] = useState<Omit<TaskCreate, 'project_id'> & { progress: number; is_milestone: boolean; task_type?: TaskType }>({
