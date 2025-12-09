@@ -114,6 +114,10 @@ export function Members() {
       setShowSkillModal(false);
       setSkillEditingMember(null);
     },
+    onError: (error: unknown) => {
+      const err = error as Error & { response?: { data?: { detail?: string } } };
+      alert(`スキルの保存に失敗しました: ${err.response?.data?.detail || err.message}`);
+    },
   });
 
   // スキル付きメンバー一覧
@@ -178,8 +182,10 @@ export function Members() {
   };
 
   const handleOpenSkillModal = (member: MemberWithUtilization) => {
+    // 先に既存のスキルを取得してから設定
+    const existingSkills = getMemberSkills(member.id);
     setSkillEditingMember(member);
-    setSelectedSkills([]);
+    setSelectedSkills(existingSkills);
     setShowSkillModal(true);
   };
 
@@ -707,6 +713,7 @@ export function Members() {
             </div>
             <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <button
+                type="button"
                 onClick={() => {
                   setShowSkillModal(false);
                   setSkillEditingMember(null);
@@ -716,6 +723,7 @@ export function Members() {
                 キャンセル
               </button>
               <button
+                type="button"
                 onClick={handleSaveSkills}
                 disabled={updateSkillsMutation.isPending}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
