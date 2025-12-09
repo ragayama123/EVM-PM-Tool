@@ -278,7 +278,7 @@ export function Tasks() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">タスク管理</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">WBS</h2>
         {selectedProjectId && (
           <div className="flex items-center gap-2">
             <button

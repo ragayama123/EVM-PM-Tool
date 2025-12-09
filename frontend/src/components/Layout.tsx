@@ -5,7 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 const navItems = [
   { path: '/', label: 'ダッシュボード', icon: LayoutDashboard },
   { path: '/projects', label: 'プロジェクト', icon: FolderKanban },
-  { path: '/tasks', label: 'タスク', icon: ListTodo },
+  { path: '/tasks', label: 'WBS', icon: ListTodo },
   { path: '/members', label: 'メンバー', icon: Users },
   { path: '/reports', label: 'レポート', icon: BarChart3 },
 ];
