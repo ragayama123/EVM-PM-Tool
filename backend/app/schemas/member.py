@@ -94,3 +94,35 @@ class MemberWithSkills(MemberResponse):
 
     class Config:
         from_attributes = True
+
+
+class DailyUtilization(BaseModel):
+    """日毎稼働率スキーマ"""
+    date: str  # YYYY-MM-DD
+    hours: float = 0  # その日のアサイン時間
+    utilization_rate: float = 0  # 稼働率（%）
+
+
+class WeeklyUtilization(BaseModel):
+    """週毎稼働率スキーマ"""
+    week_start: str  # 週の開始日（月曜日）YYYY-MM-DD
+    week_end: str  # 週の終了日（日曜日）YYYY-MM-DD
+    hours: float = 0  # その週のアサイン時間
+    available_hours: float = 0  # 週あたり稼働可能時間
+    utilization_rate: float = 0  # 稼働率（%）
+
+
+class MemberUtilizationDetail(BaseModel):
+    """メンバー稼働率詳細レスポンススキーマ"""
+    member_id: int
+    member_name: str
+    available_hours_per_week: float
+    available_hours_per_day: float  # 1日あたりの稼働可能時間（週/5）
+    daily: List[DailyUtilization] = []
+    weekly: List[WeeklyUtilization] = []
+
+
+class ProjectUtilizationRequest(BaseModel):
+    """プロジェクト稼働率リクエストスキーマ"""
+    start_date: str  # YYYY-MM-DD
+    end_date: str  # YYYY-MM-DD

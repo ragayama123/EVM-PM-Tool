@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM, MemberWithSkills, Holiday, HolidayCreate, HolidayImportItem, HolidayGenerateRequest, WorkingDaysInfo, HolidayType, ReschedulePreviewResponse, RescheduleResponse, AutoSchedulePreviewResponse, AutoScheduleResponse } from '../types';
+import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM, MemberWithSkills, MemberUtilizationDetail, Holiday, HolidayCreate, HolidayImportItem, HolidayGenerateRequest, WorkingDaysInfo, HolidayType, ReschedulePreviewResponse, RescheduleResponse, AutoSchedulePreviewResponse, AutoScheduleResponse } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -227,6 +227,13 @@ export const membersApi = {
 
   updateSkills: async (memberId: number, taskTypes: string[]): Promise<string[]> => {
     const { data } = await api.put(`/members/${memberId}/skills`, { task_types: taskTypes });
+    return data;
+  },
+
+  getUtilization: async (projectId: number, startDate: string, endDate: string): Promise<MemberUtilizationDetail[]> => {
+    const { data } = await api.get(`/members/project/${projectId}/utilization`, {
+      params: { start_date: startDate, end_date: endDate },
+    });
     return data;
   },
 };

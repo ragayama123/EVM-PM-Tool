@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { projectsApi, membersApi } from '../api/client';
-import { Users, Plus, Trash2, Pencil, AlertTriangle, TrendingUp, TrendingDown, Settings } from 'lucide-react';
+import { Users, Plus, Trash2, Pencil, AlertTriangle, TrendingUp, TrendingDown, Settings, Calendar, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react';
 import { Tooltip } from '../components/Tooltip';
 import type { MemberCreate, MemberWithUtilization } from '../types';
 import { TASK_TYPES, type TaskType } from '../types';
@@ -33,6 +33,21 @@ export function Members() {
   const [skillEditingMember, setSkillEditingMember] = useState<MemberWithUtilization | null>(null);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
 
+  // 稼働率表示用ステート
+  const [utilizationView, setUtilizationView] = useState<'summary' | 'daily' | 'weekly'>('summary');
+  const [utilizationStartDate, setUtilizationStartDate] = useState<string>(() => {
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - today.getDay() + 1);
+    return monday.toISOString().split('T')[0];
+  });
+  const [utilizationEndDate, setUtilizationEndDate] = useState<string>(() => {
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + 28);
+    return endDate.toISOString().split('T')[0];
+  });
+
   const { data: projects } = useQuery({
     queryKey: ['projects'],
     queryFn: projectsApi.getAll,
@@ -48,6 +63,13 @@ export function Members() {
     queryKey: ['members-evm', selectedProjectId],
     queryFn: () => membersApi.getEvmByProject(selectedProjectId!),
     enabled: !!selectedProjectId,
+  });
+
+  // 稼働率詳細クエリ
+  const { data: utilizationData, isLoading: utilizationLoading } = useQuery({
+    queryKey: ['members-utilization', selectedProjectId, utilizationStartDate, utilizationEndDate],
+    queryFn: () => membersApi.getUtilization(selectedProjectId!, utilizationStartDate, utilizationEndDate),
+    enabled: !!selectedProjectId && utilizationView !== 'summary',
   });
 
   const createMutation = useMutation({
@@ -286,136 +308,374 @@ export function Members() {
       {selectedProjectId && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">稼働率一覧</h3>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">稼働率一覧</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setUtilizationView('summary')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                    utilizationView === 'summary'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4 inline-block mr-1" />
+                  サマリー
+                </button>
+                <button
+                  onClick={() => setUtilizationView('daily')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                    utilizationView === 'daily'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <Calendar className="w-4 h-4 inline-block mr-1" />
+                  日別
+                </button>
+                <button
+                  onClick={() => setUtilizationView('weekly')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                    utilizationView === 'weekly'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <Calendar className="w-4 h-4 inline-block mr-1" />
+                  週別
+                </button>
+              </div>
+            </div>
+            {/* 日別・週別表示時の期間選択 */}
+            {utilizationView !== 'summary' && (
+              <div className="flex items-center gap-4 mt-4">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const start = new Date(utilizationStartDate);
+                      const end = new Date(utilizationEndDate);
+                      start.setDate(start.getDate() - 7);
+                      end.setDate(end.getDate() - 7);
+                      setUtilizationStartDate(start.toISOString().split('T')[0]);
+                      setUtilizationEndDate(end.toISOString().split('T')[0]);
+                    }}
+                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <input
+                    type="date"
+                    value={utilizationStartDate}
+                    onChange={(e) => setUtilizationStartDate(e.target.value)}
+                    className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <span className="text-gray-500 dark:text-gray-400">〜</span>
+                  <input
+                    type="date"
+                    value={utilizationEndDate}
+                    onChange={(e) => setUtilizationEndDate(e.target.value)}
+                    className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <button
+                    onClick={() => {
+                      const start = new Date(utilizationStartDate);
+                      const end = new Date(utilizationEndDate);
+                      start.setDate(start.getDate() + 7);
+                      end.setDate(end.getDate() + 7);
+                      setUtilizationStartDate(start.toISOString().split('T')[0]);
+                      setUtilizationEndDate(end.toISOString().split('T')[0]);
+                    }}
+                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    メンバー名
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    稼働可能時間/週
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    アサイン工数
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    稼働率
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    担当可能タスク
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    操作
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {membersLoading ? (
+          {/* サマリービュー */}
+          {utilizationView === 'summary' && (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                      読み込み中...
-                    </td>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      メンバー名
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      稼働可能時間/週
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      アサイン工数
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      稼働率
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      担当可能タスク
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      操作
+                    </th>
                   </tr>
-                ) : members && members.length > 0 ? (
-                  members.map((member) => (
-                    <tr key={member.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <Users className="w-5 h-5 text-gray-400" />
-                          <span className="font-medium text-gray-900 dark:text-white">
-                            {member.name}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {member.available_hours_per_week}h
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {member.assigned_hours}h
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <div className="w-24 bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
-                            <div
-                              className={`h-2.5 rounded-full ${getUtilizationBarColor(member.utilization_rate)}`}
-                              style={{ width: `${Math.min(member.utilization_rate, 100)}%` }}
-                            />
-                          </div>
-                          <span className={`text-sm font-medium ${getUtilizationColor(member.utilization_rate)}`}>
-                            {member.utilization_rate}%
-                          </span>
-                          {member.utilization_rate > 100 && (
-                            <AlertTriangle className="w-4 h-4 text-red-500" />
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {getMemberSkills(member.id).length > 0 ? (
-                            getMemberSkills(member.id).map((skill) => (
-                              <span
-                                key={skill}
-                                className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded"
-                              >
-                                {TASK_TYPES[skill as TaskType] || skill}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-sm text-gray-400 dark:text-gray-500">未設定</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleOpenSkillModal(member)}
-                            className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300"
-                            title="スキル設定"
-                          >
-                            <Settings className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleEdit(member)}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                            title="編集"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (confirm('このメンバーを削除しますか？担当タスクの割り当ては解除されます。')) {
-                                deleteMutation.mutate(member.id);
-                              }
-                            }}
-                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-                            title="削除"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {membersLoading ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        読み込み中...
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                      <Users className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
-                      <p>メンバーがいません</p>
-                      <button
-                        onClick={() => setShowForm(true)}
-                        className="mt-4 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                      >
-                        最初のメンバーを追加する
-                      </button>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : members && members.length > 0 ? (
+                    members.map((member) => (
+                      <tr key={member.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <Users className="w-5 h-5 text-gray-400" />
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              {member.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {member.available_hours_per_week}h
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {member.assigned_hours}h
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <div className="w-24 bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                              <div
+                                className={`h-2.5 rounded-full ${getUtilizationBarColor(member.utilization_rate)}`}
+                                style={{ width: `${Math.min(member.utilization_rate, 100)}%` }}
+                              />
+                            </div>
+                            <span className={`text-sm font-medium ${getUtilizationColor(member.utilization_rate)}`}>
+                              {member.utilization_rate}%
+                            </span>
+                            {member.utilization_rate > 100 && (
+                              <AlertTriangle className="w-4 h-4 text-red-500" />
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-1">
+                            {getMemberSkills(member.id).length > 0 ? (
+                              getMemberSkills(member.id).map((skill) => (
+                                <span
+                                  key={skill}
+                                  className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded"
+                                >
+                                  {TASK_TYPES[skill as TaskType] || skill}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-sm text-gray-400 dark:text-gray-500">未設定</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleOpenSkillModal(member)}
+                              className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300"
+                              title="スキル設定"
+                            >
+                              <Settings className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleEdit(member)}
+                              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                              title="編集"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm('このメンバーを削除しますか？担当タスクの割り当ては解除されます。')) {
+                                  deleteMutation.mutate(member.id);
+                                }
+                              }}
+                              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                              title="削除"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        <Users className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                        <p>メンバーがいません</p>
+                        <button
+                          onClick={() => setShowForm(true)}
+                          className="mt-4 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                        >
+                          最初のメンバーを追加する
+                        </button>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* 日別ビュー */}
+          {utilizationView === 'daily' && (
+            <div className="overflow-x-auto">
+              {utilizationLoading ? (
+                <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  読み込み中...
+                </div>
+              ) : utilizationData && utilizationData.length > 0 ? (
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 dark:bg-gray-700 z-10">
+                        メンバー
+                      </th>
+                      {utilizationData[0]?.daily.map((day) => {
+                        const dateObj = new Date(day.date);
+                        const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][dateObj.getDay()];
+                        const isToday = day.date === new Date().toISOString().split('T')[0];
+                        return (
+                          <th
+                            key={day.date}
+                            className={`px-2 py-3 text-center text-xs font-medium uppercase tracking-wider min-w-[60px] ${
+                              isToday ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'text-gray-500 dark:text-gray-400'
+                            }`}
+                          >
+                            <div>{dateObj.getMonth() + 1}/{dateObj.getDate()}</div>
+                            <div className="text-[10px]">({dayOfWeek})</div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {utilizationData.map((member) => (
+                      <tr key={member.member_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-white dark:bg-gray-800 z-10">
+                          <div className="flex items-center gap-2">
+                            <Users className="w-4 h-4 text-gray-400" />
+                            <span className="font-medium text-gray-900 dark:text-white text-sm">
+                              {member.member_name}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {member.available_hours_per_day}h/日
+                          </div>
+                        </td>
+                        {member.daily.map((day) => {
+                          const isToday = day.date === new Date().toISOString().split('T')[0];
+                          return (
+                            <td
+                              key={day.date}
+                              className={`px-2 py-3 text-center ${isToday ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                            >
+                              <div
+                                className={`text-sm font-medium ${getUtilizationColor(day.utilization_rate)}`}
+                                title={`${day.hours}h / ${member.available_hours_per_day}h`}
+                              >
+                                {day.utilization_rate > 0 ? `${day.utilization_rate}%` : '-'}
+                              </div>
+                              {day.hours > 0 && (
+                                <div className="text-xs text-gray-400">{day.hours}h</div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <Users className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                  <p>メンバーがいないか、タスクがアサインされていません</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 週別ビュー */}
+          {utilizationView === 'weekly' && (
+            <div className="overflow-x-auto">
+              {utilizationLoading ? (
+                <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  読み込み中...
+                </div>
+              ) : utilizationData && utilizationData.length > 0 ? (
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 dark:bg-gray-700 z-10">
+                        メンバー
+                      </th>
+                      {utilizationData[0]?.weekly.map((week) => {
+                        const startDate = new Date(week.week_start);
+                        const endDate = new Date(week.week_end);
+                        return (
+                          <th
+                            key={week.week_start}
+                            className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[100px]"
+                          >
+                            <div>{startDate.getMonth() + 1}/{startDate.getDate()}</div>
+                            <div className="text-[10px]">〜{endDate.getMonth() + 1}/{endDate.getDate()}</div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {utilizationData.map((member) => (
+                      <tr key={member.member_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-white dark:bg-gray-800 z-10">
+                          <div className="flex items-center gap-2">
+                            <Users className="w-4 h-4 text-gray-400" />
+                            <span className="font-medium text-gray-900 dark:text-white text-sm">
+                              {member.member_name}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {member.available_hours_per_week}h/週
+                          </div>
+                        </td>
+                        {member.weekly.map((week) => (
+                          <td key={week.week_start} className="px-3 py-3 text-center">
+                            <div
+                              className={`text-sm font-medium ${getUtilizationColor(week.utilization_rate)}`}
+                              title={`${week.hours}h / ${week.available_hours}h`}
+                            >
+                              {week.utilization_rate > 0 ? `${week.utilization_rate}%` : '-'}
+                            </div>
+                            {week.hours > 0 && (
+                              <div className="text-xs text-gray-400">
+                                {week.hours}h / {week.available_hours}h
+                              </div>
+                            )}
+                            {week.utilization_rate > 100 && (
+                              <AlertTriangle className="w-3 h-3 text-red-500 mx-auto mt-1" />
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <Users className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                  <p>メンバーがいないか、タスクがアサインされていません</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

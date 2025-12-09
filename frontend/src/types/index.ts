@@ -264,3 +264,29 @@ export interface AutoScheduleResponse {
   updated_count: number;
   updated_tasks: AutoSchedulePreviewTask[];
 }
+
+// 日毎稼働率
+export interface DailyUtilization {
+  date: string;  // YYYY-MM-DD
+  hours: number;  // その日のアサイン時間
+  utilization_rate: number;  // 稼働率（%）
+}
+
+// 週毎稼働率
+export interface WeeklyUtilization {
+  week_start: string;  // 週の開始日（月曜日）YYYY-MM-DD
+  week_end: string;  // 週の終了日（日曜日）YYYY-MM-DD
+  hours: number;  // その週のアサイン時間
+  available_hours: number;  // 週あたり稼働可能時間
+  utilization_rate: number;  // 稼働率（%）
+}
+
+// メンバー稼働率詳細
+export interface MemberUtilizationDetail {
+  member_id: number;
+  member_name: string;
+  available_hours_per_week: number;
+  available_hours_per_day: number;  // 1日あたりの稼働可能時間
+  daily: DailyUtilization[];
+  weekly: WeeklyUtilization[];
+}

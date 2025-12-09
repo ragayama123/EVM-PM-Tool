@@ -1,16 +1,19 @@
-from typing import List
-from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List, Dict, Set
+from datetime import datetime, timezone, date, timedelta
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
+from collections import defaultdict
 
 from app.core.database import get_db
 from app.models.member import Member
 from app.models.member_skill import MemberSkill
 from app.models.task import Task
+from app.models.holiday import Holiday
 from app.schemas.member import (
     MemberCreate, MemberUpdate, MemberResponse, MemberWithUtilization, MemberEVM,
-    MemberSkillUpdate, MemberWithSkills, TASK_TYPES
+    MemberSkillUpdate, MemberWithSkills, TASK_TYPES,
+    DailyUtilization, WeeklyUtilization, MemberUtilizationDetail
 )
 
 router = APIRouter(prefix="/members", tags=["members"])
@@ -164,6 +167,138 @@ def get_members_with_skills(project_id: int, db: Session = Depends(get_db)):
             created_at=member.created_at,
             updated_at=member.updated_at,
             skills=[s[0] for s in skills]
+        ))
+
+    return result
+
+
+@router.get("/project/{project_id}/utilization", response_model=List[MemberUtilizationDetail])
+def get_members_utilization(
+    project_id: int,
+    start_date: str = Query(..., description="開始日 (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="終了日 (YYYY-MM-DD)"),
+    db: Session = Depends(get_db)
+):
+    """プロジェクトのメンバー稼働率詳細を取得（日毎・週毎）"""
+    # 日付をパース
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="日付形式が不正です（YYYY-MM-DD）")
+
+    if start > end:
+        raise HTTPException(status_code=400, detail="開始日は終了日以前である必要があります")
+
+    # プロジェクトの休日を取得
+    holidays = db.query(Holiday.date).filter(
+        Holiday.project_id == project_id
+    ).all()
+    holiday_dates: Set[date] = {h.date.date() if isinstance(h.date, datetime) else h.date for h in holidays}
+
+    # メンバー一覧を取得
+    members = db.query(Member).filter(Member.project_id == project_id).all()
+
+    result = []
+    for member in members:
+        hours_per_day = member.available_hours_per_week / 5  # 週5日稼働として計算
+
+        # メンバーのタスクを取得
+        tasks = db.query(Task).filter(
+            Task.assigned_member_id == member.id,
+            Task.planned_start_date != None,
+            Task.planned_end_date != None
+        ).all()
+
+        # 日毎の稼働時間を計算
+        daily_hours: Dict[date, float] = defaultdict(float)
+
+        for task in tasks:
+            task_start = task.planned_start_date.date() if isinstance(task.planned_start_date, datetime) else task.planned_start_date
+            task_end = task.planned_end_date.date() if isinstance(task.planned_end_date, datetime) else task.planned_end_date
+
+            if task_start is None or task_end is None:
+                continue
+
+            # タスク期間内の稼働日数を計算
+            working_days = 0
+            current = task_start
+            while current <= task_end:
+                if current.weekday() < 5 and current not in holiday_dates:  # 平日かつ休日でない
+                    working_days += 1
+                current += timedelta(days=1)
+
+            if working_days == 0:
+                continue
+
+            # 1日あたりの工数
+            hours_per_working_day = task.planned_hours / working_days
+
+            # 各日に工数を割り当て
+            current = task_start
+            while current <= task_end:
+                if current.weekday() < 5 and current not in holiday_dates:
+                    if start <= current <= end:
+                        daily_hours[current] += hours_per_working_day
+                current += timedelta(days=1)
+
+        # 日毎の稼働率リストを作成
+        daily_list = []
+        current = start
+        while current <= end:
+            if current.weekday() < 5 and current not in holiday_dates:  # 稼働日のみ
+                hours = daily_hours.get(current, 0)
+                utilization = (hours / hours_per_day * 100) if hours_per_day > 0 else 0
+                daily_list.append(DailyUtilization(
+                    date=current.strftime("%Y-%m-%d"),
+                    hours=round(hours, 2),
+                    utilization_rate=round(utilization, 1)
+                ))
+            current += timedelta(days=1)
+
+        # 週毎の稼働率を計算
+        weekly_list = []
+        # 開始日を含む週の月曜日を取得
+        week_start = start - timedelta(days=start.weekday())
+        while week_start <= end:
+            week_end = week_start + timedelta(days=6)  # 日曜日
+
+            # その週の稼働時間を集計
+            week_hours = 0
+            current = week_start
+            while current <= week_end:
+                if start <= current <= end:
+                    week_hours += daily_hours.get(current, 0)
+                current += timedelta(days=1)
+
+            # その週の稼働可能時間（期間内のみ）
+            week_working_days = 0
+            current = week_start
+            while current <= week_end:
+                if start <= current <= end and current.weekday() < 5 and current not in holiday_dates:
+                    week_working_days += 1
+                current += timedelta(days=1)
+
+            available_hours = week_working_days * hours_per_day
+            utilization = (week_hours / available_hours * 100) if available_hours > 0 else 0
+
+            weekly_list.append(WeeklyUtilization(
+                week_start=week_start.strftime("%Y-%m-%d"),
+                week_end=week_end.strftime("%Y-%m-%d"),
+                hours=round(week_hours, 2),
+                available_hours=round(available_hours, 2),
+                utilization_rate=round(utilization, 1)
+            ))
+
+            week_start += timedelta(days=7)
+
+        result.append(MemberUtilizationDetail(
+            member_id=member.id,
+            member_name=member.name,
+            available_hours_per_week=member.available_hours_per_week,
+            available_hours_per_day=round(hours_per_day, 2),
+            daily=daily_list,
+            weekly=weekly_list
         ))
 
     return result
