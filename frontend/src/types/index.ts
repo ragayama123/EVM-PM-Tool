@@ -180,3 +180,36 @@ export interface WorkingDaysInfo {
   holiday_count: number;
   working_days: number;
 }
+
+// リスケジュール関連
+export interface ReschedulePreviewTask {
+  id: number;
+  name: string;
+  current_start?: string;
+  current_end?: string;
+  new_start?: string;
+  new_end?: string;
+  is_child: boolean;
+  parent_id?: number;
+}
+
+export interface ReschedulePreviewResponse {
+  base_task_name: string;
+  shift_days: number;
+  affected_tasks: ReschedulePreviewTask[];
+  total_count: number;
+}
+
+export interface RescheduleUpdatedTask {
+  id: number;
+  name: string;
+  new_start?: string;
+  new_end?: string;
+  parent_id?: number;
+}
+
+export interface RescheduleResponse {
+  message: string;
+  updated_count: number;
+  updated_tasks: RescheduleUpdatedTask[];
+}

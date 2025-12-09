@@ -5,7 +5,15 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.task import Task
 from app.models.project import Project, ProjectStatus
-from app.schemas.task import TaskCreate, TaskUpdate, TaskResponse
+from app.schemas.task import (
+    TaskCreate,
+    TaskUpdate,
+    TaskResponse,
+    RescheduleRequest,
+    ReschedulePreviewResponse,
+    RescheduleResponse,
+)
+from app.services.reschedule import RescheduleService
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -167,3 +175,74 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
     update_project_dates(db, project_id)
 
     return {"message": "タスクを削除しました"}
+
+
+@router.post("/project/{project_id}/reschedule/preview", response_model=ReschedulePreviewResponse)
+def preview_reschedule(
+    project_id: int,
+    request: RescheduleRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    リスケジュールのプレビュー
+    実際の更新は行わず、影響を受けるタスクの変更前後の日付を返す
+    """
+    # プロジェクト存在確認
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+
+    service = RescheduleService(db, project_id)
+
+    # 基準タスク存在確認
+    base_task = service.get_base_task(request.base_task_id)
+    if not base_task:
+        raise HTTPException(status_code=404, detail="基準タスクが見つかりません")
+
+    if not base_task.planned_start_date:
+        raise HTTPException(
+            status_code=400,
+            detail="基準タスクに予定開始日が設定されていません"
+        )
+
+    result = service.preview(request.base_task_id, request.shift_days)
+    return result
+
+
+@router.post("/project/{project_id}/reschedule", response_model=RescheduleResponse)
+def execute_reschedule(
+    project_id: int,
+    request: RescheduleRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    リスケジュール実行
+    base_task_id以降の親タスク（とその子タスク）をshift_days稼働日分ずらす
+    """
+    # プロジェクト存在確認
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+
+    service = RescheduleService(db, project_id)
+
+    # 基準タスク存在確認
+    base_task = service.get_base_task(request.base_task_id)
+    if not base_task:
+        raise HTTPException(status_code=404, detail="基準タスクが見つかりません")
+
+    if not base_task.planned_start_date:
+        raise HTTPException(
+            status_code=400,
+            detail="基準タスクに予定開始日が設定されていません"
+        )
+
+    result = service.reschedule(request.base_task_id, request.shift_days)
+
+    # プロジェクト期間を自動更新
+    update_project_dates(db, project_id)
+
+    return {
+        "message": f"{result['updated_count']}件のタスクをリスケジュールしました",
+        **result
+    }

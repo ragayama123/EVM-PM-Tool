@@ -61,3 +61,46 @@ class TaskTreeResponse(TaskResponse):
 
     class Config:
         from_attributes = True
+
+
+# リスケジュール関連スキーマ
+class RescheduleRequest(BaseModel):
+    """リスケジュールリクエストスキーマ"""
+    base_task_id: int  # 基準タスクID
+    shift_days: int = Field(..., ge=-365, le=365)  # ずらす稼働日数
+
+
+class ReschedulePreviewTask(BaseModel):
+    """プレビュー用タスク情報"""
+    id: int
+    name: str
+    current_start: Optional[datetime] = None
+    current_end: Optional[datetime] = None
+    new_start: Optional[datetime] = None
+    new_end: Optional[datetime] = None
+    is_child: bool = False
+    parent_id: Optional[int] = None
+
+
+class ReschedulePreviewResponse(BaseModel):
+    """リスケジュールプレビューレスポンス"""
+    base_task_name: str
+    shift_days: int
+    affected_tasks: List[ReschedulePreviewTask]
+    total_count: int
+
+
+class RescheduleUpdatedTask(BaseModel):
+    """更新されたタスク情報"""
+    id: int
+    name: str
+    new_start: Optional[str] = None
+    new_end: Optional[str] = None
+    parent_id: Optional[int] = None
+
+
+class RescheduleResponse(BaseModel):
+    """リスケジュール実行結果"""
+    message: str
+    updated_count: int
+    updated_tasks: List[RescheduleUpdatedTask]

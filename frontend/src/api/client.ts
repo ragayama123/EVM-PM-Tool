@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM, Holiday, HolidayCreate, HolidayImportItem, HolidayGenerateRequest, WorkingDaysInfo, HolidayType } from '../types';
+import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM, Holiday, HolidayCreate, HolidayImportItem, HolidayGenerateRequest, WorkingDaysInfo, HolidayType, ReschedulePreviewResponse, RescheduleResponse } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -112,6 +112,22 @@ export const tasksApi = {
 
   delete: async (id: number): Promise<void> => {
     await api.delete(`/tasks/${id}`);
+  },
+
+  reschedulePreview: async (projectId: number, baseTaskId: number, shiftDays: number): Promise<ReschedulePreviewResponse> => {
+    const { data } = await api.post(`/tasks/project/${projectId}/reschedule/preview`, {
+      base_task_id: baseTaskId,
+      shift_days: shiftDays,
+    });
+    return data;
+  },
+
+  reschedule: async (projectId: number, baseTaskId: number, shiftDays: number): Promise<RescheduleResponse> => {
+    const { data } = await api.post(`/tasks/project/${projectId}/reschedule`, {
+      base_task_id: baseTaskId,
+      shift_days: shiftDays,
+    });
+    return data;
   },
 };
 
