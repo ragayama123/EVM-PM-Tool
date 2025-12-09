@@ -6,8 +6,12 @@ from sqlalchemy import func as sql_func
 
 from app.core.database import get_db
 from app.models.member import Member
+from app.models.member_skill import MemberSkill
 from app.models.task import Task
-from app.schemas.member import MemberCreate, MemberUpdate, MemberResponse, MemberWithUtilization, MemberEVM
+from app.schemas.member import (
+    MemberCreate, MemberUpdate, MemberResponse, MemberWithUtilization, MemberEVM,
+    MemberSkillUpdate, MemberWithSkills, TASK_TYPES
+)
 
 router = APIRouter(prefix="/members", tags=["members"])
 
@@ -93,6 +97,76 @@ def delete_member(member_id: int, db: Session = Depends(get_db)):
     db.delete(db_member)
     db.commit()
     return {"message": "メンバーを削除しました"}
+
+
+@router.get("/{member_id}/skills", response_model=List[str])
+def get_member_skills(member_id: int, db: Session = Depends(get_db)):
+    """メンバーのスキル（担当可能タスク種別）を取得"""
+    member = db.query(Member).filter(Member.id == member_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="メンバーが見つかりません")
+
+    skills = db.query(MemberSkill.task_type).filter(
+        MemberSkill.member_id == member_id
+    ).all()
+
+    return [s[0] for s in skills]
+
+
+@router.put("/{member_id}/skills", response_model=List[str])
+def update_member_skills(
+    member_id: int,
+    request: MemberSkillUpdate,
+    db: Session = Depends(get_db)
+):
+    """メンバーのスキル（担当可能タスク種別）を更新"""
+    member = db.query(Member).filter(Member.id == member_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="メンバーが見つかりません")
+
+    # 無効なタスク種別をチェック
+    invalid_types = [t for t in request.task_types if t not in TASK_TYPES]
+    if invalid_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"無効なタスク種別: {', '.join(invalid_types)}"
+        )
+
+    # 既存のスキルを削除
+    db.query(MemberSkill).filter(MemberSkill.member_id == member_id).delete()
+
+    # 新しいスキルを追加
+    for task_type in request.task_types:
+        skill = MemberSkill(member_id=member_id, task_type=task_type)
+        db.add(skill)
+
+    db.commit()
+
+    return request.task_types
+
+
+@router.get("/project/{project_id}/with-skills", response_model=List[MemberWithSkills])
+def get_members_with_skills(project_id: int, db: Session = Depends(get_db)):
+    """プロジェクトのメンバー一覧を取得（スキル付き）"""
+    members = db.query(Member).filter(Member.project_id == project_id).all()
+
+    result = []
+    for member in members:
+        skills = db.query(MemberSkill.task_type).filter(
+            MemberSkill.member_id == member.id
+        ).all()
+
+        result.append(MemberWithSkills(
+            id=member.id,
+            project_id=member.project_id,
+            name=member.name,
+            available_hours_per_week=member.available_hours_per_week,
+            created_at=member.created_at,
+            updated_at=member.updated_at,
+            skills=[s[0] for s in skills]
+        ))
+
+    return result
 
 
 @router.get("/project/{project_id}/evm", response_model=List[MemberEVM])

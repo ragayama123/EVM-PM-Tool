@@ -12,8 +12,12 @@ from app.schemas.task import (
     RescheduleRequest,
     ReschedulePreviewResponse,
     RescheduleResponse,
+    AutoScheduleRequest,
+    AutoSchedulePreviewResponse,
+    AutoScheduleResponse,
 )
 from app.services.reschedule import RescheduleService
+from app.services.auto_schedule import AutoScheduleService
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -246,3 +250,47 @@ def execute_reschedule(
         "message": f"{result['updated_count']}件のタスクをリスケジュールしました",
         **result
     }
+
+
+@router.post("/project/{project_id}/auto-schedule/preview", response_model=AutoSchedulePreviewResponse)
+def preview_auto_schedule(
+    project_id: int,
+    request: AutoScheduleRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    自動スケジュールのプレビュー
+    実際の更新は行わず、計算結果を返す
+    """
+    # プロジェクト存在確認
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+
+    service = AutoScheduleService(db, project_id)
+    result = service.preview(request.task_ids, request.start_date)
+    return result
+
+
+@router.post("/project/{project_id}/auto-schedule", response_model=AutoScheduleResponse)
+def execute_auto_schedule(
+    project_id: int,
+    request: AutoScheduleRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    自動スケジュール実行
+    タスクの担当者と日付を自動設定
+    """
+    # プロジェクト存在確認
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+
+    service = AutoScheduleService(db, project_id)
+    result = service.execute(request.task_ids, request.start_date)
+
+    # プロジェクト期間を自動更新
+    update_project_dates(db, project_id)
+
+    return result

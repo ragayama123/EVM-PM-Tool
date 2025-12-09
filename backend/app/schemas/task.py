@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List
 from pydantic import BaseModel, Field
 
@@ -11,6 +11,7 @@ class TaskBase(BaseModel):
     actual_hours: float = 0
     hourly_rate: float = 0
     is_milestone: bool = False  # 固定日付タスク（リスケジュール対象外）
+    task_type: Optional[str] = None  # タスク種別（フェーズ）
     # 予定スケジュール
     planned_start_date: Optional[datetime] = None
     planned_end_date: Optional[datetime] = None
@@ -35,6 +36,7 @@ class TaskUpdate(BaseModel):
     progress: Optional[float] = Field(None, ge=0, le=100)
     hourly_rate: Optional[float] = None
     is_milestone: Optional[bool] = None  # 固定日付タスク
+    task_type: Optional[str] = None  # タスク種別（フェーズ）
     planned_start_date: Optional[datetime] = None
     planned_end_date: Optional[datetime] = None
     actual_start_date: Optional[datetime] = None
@@ -106,3 +108,40 @@ class RescheduleResponse(BaseModel):
     message: str
     updated_count: int
     updated_tasks: List[RescheduleUpdatedTask]
+
+
+# 自動スケジュール関連スキーマ
+class AutoScheduleRequest(BaseModel):
+    """自動スケジュールリクエストスキーマ"""
+    task_ids: List[int]  # 対象タスクID（空の場合は全タスク）
+    start_date: date     # 基準開始日
+
+
+class AutoSchedulePreviewTask(BaseModel):
+    """自動スケジュールプレビュー用タスク情報"""
+    id: int
+    name: str
+    task_type: Optional[str] = None
+    planned_hours: float
+    calculated_days: int
+    current_member_id: Optional[int] = None
+    current_member_name: Optional[str] = None
+    new_member_id: Optional[int] = None
+    new_member_name: Optional[str] = None
+    new_start: Optional[date] = None
+    new_end: Optional[date] = None
+
+
+class AutoSchedulePreviewResponse(BaseModel):
+    """自動スケジュールプレビューレスポンス"""
+    start_date: date
+    tasks: List[AutoSchedulePreviewTask]
+    total_count: int
+    warnings: List[str]
+
+
+class AutoScheduleResponse(BaseModel):
+    """自動スケジュール実行結果"""
+    message: str
+    updated_count: int
+    updated_tasks: List[AutoSchedulePreviewTask]

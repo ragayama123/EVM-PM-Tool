@@ -28,6 +28,9 @@ class Task(Base):
     # マイルストーン（固定日付タスク - リスケジュール対象外）
     is_milestone = Column(Boolean, nullable=False, default=False)
 
+    # タスク種別（フェーズ）
+    task_type = Column(String, nullable=True)
+
     # 予定スケジュール
     planned_start_date = Column(DateTime(timezone=True), nullable=True)
     planned_end_date = Column(DateTime(timezone=True), nullable=True)

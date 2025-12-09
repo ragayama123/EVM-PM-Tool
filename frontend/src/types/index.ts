@@ -1,6 +1,20 @@
 // プロジェクトステータス
 export type ProjectStatus = 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
 
+// タスク種別（フェーズ）
+export const TASK_TYPES = {
+  requirements: '要件定義',
+  external_design: '外部設計',
+  detailed_design: '詳細設計',
+  development: 'PG/UT',
+  ci: 'CI',
+  it: 'IT',
+  st: 'ST',
+  release: '本番化',
+} as const;
+
+export type TaskType = keyof typeof TASK_TYPES;
+
 // プロジェクト
 export interface Project {
   id: number;
@@ -59,6 +73,10 @@ export interface MemberEVM {
   eac: number;  // Estimate at Completion
 }
 
+export interface MemberWithSkills extends Member {
+  skills: TaskType[];
+}
+
 // タスク
 export interface Task {
   id: number;
@@ -72,6 +90,7 @@ export interface Task {
   progress: number;
   hourly_rate: number;
   is_milestone: boolean;  // 固定日付タスク（リスケジュール対象外）
+  task_type?: TaskType;   // タスク種別（フェーズ）
   // 予定スケジュール
   planned_start_date?: string;
   planned_end_date?: string;
@@ -93,6 +112,7 @@ export interface TaskCreate {
   actual_hours?: number;
   hourly_rate?: number;
   is_milestone?: boolean;  // 固定日付タスク
+  task_type?: TaskType;    // タスク種別（フェーズ）
   planned_start_date?: string;
   planned_end_date?: string;
   actual_start_date?: string;
@@ -214,4 +234,32 @@ export interface RescheduleResponse {
   message: string;
   updated_count: number;
   updated_tasks: RescheduleUpdatedTask[];
+}
+
+// 自動スケジュール関連
+export interface AutoSchedulePreviewTask {
+  id: number;
+  name: string;
+  task_type?: string;
+  planned_hours: number;
+  calculated_days: number;
+  current_member_id?: number;
+  current_member_name?: string;
+  new_member_id?: number;
+  new_member_name?: string;
+  new_start?: string;
+  new_end?: string;
+}
+
+export interface AutoSchedulePreviewResponse {
+  start_date: string;
+  tasks: AutoSchedulePreviewTask[];
+  total_count: number;
+  warnings: string[];
+}
+
+export interface AutoScheduleResponse {
+  message: string;
+  updated_count: number;
+  updated_tasks: AutoSchedulePreviewTask[];
 }

@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { projectsApi, membersApi } from '../api/client';
-import { Users, Plus, Trash2, Pencil, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
+import { Users, Plus, Trash2, Pencil, AlertTriangle, TrendingUp, TrendingDown, Settings } from 'lucide-react';
 import { Tooltip } from '../components/Tooltip';
 import type { MemberCreate, MemberWithUtilization } from '../types';
+import { TASK_TYPES, type TaskType } from '../types';
 
 // EVM用語の説明（工数ベース）
 const evmTooltips = {
@@ -25,6 +26,11 @@ export function Members() {
     name: '',
     available_hours_per_week: 40,
   });
+
+  // スキル設定用ステート
+  const [showSkillModal, setShowSkillModal] = useState(false);
+  const [skillEditingMember, setSkillEditingMember] = useState<MemberWithUtilization | null>(null);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -64,8 +70,42 @@ export function Members() {
     mutationFn: membersApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['members', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['members-with-skills', selectedProjectId] });
     },
   });
+
+  // メンバーのスキル取得
+  const { data: memberSkills } = useQuery({
+    queryKey: ['member-skills', skillEditingMember?.id],
+    queryFn: () => membersApi.getSkills(skillEditingMember!.id),
+    enabled: !!skillEditingMember,
+  });
+
+  // スキル更新
+  const updateSkillsMutation = useMutation({
+    mutationFn: ({ memberId, skills }: { memberId: number; skills: string[] }) =>
+      membersApi.updateSkills(memberId, skills),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['members-with-skills', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['member-skills', skillEditingMember?.id] });
+      setShowSkillModal(false);
+      setSkillEditingMember(null);
+    },
+  });
+
+  // スキル付きメンバー一覧
+  const { data: membersWithSkills } = useQuery({
+    queryKey: ['members-with-skills', selectedProjectId],
+    queryFn: () => membersApi.getWithSkills(selectedProjectId!),
+    enabled: !!selectedProjectId,
+  });
+
+  // スキルモーダルを開いたときにスキルを設定
+  useEffect(() => {
+    if (memberSkills) {
+      setSelectedSkills(memberSkills);
+    }
+  }, [memberSkills]);
 
   // 最初のプロジェクトを自動選択
   if (projects && projects.length > 0 && !selectedProjectId) {
@@ -112,6 +152,36 @@ export function Members() {
     if (rate > 100) return 'bg-red-500';
     if (rate > 80) return 'bg-yellow-500';
     return 'bg-green-500';
+  };
+
+  const handleOpenSkillModal = (member: MemberWithUtilization) => {
+    setSkillEditingMember(member);
+    setSelectedSkills([]);
+    setShowSkillModal(true);
+  };
+
+  const handleSkillToggle = (taskType: string) => {
+    setSelectedSkills(prev =>
+      prev.includes(taskType)
+        ? prev.filter(s => s !== taskType)
+        : [...prev, taskType]
+    );
+  };
+
+  const handleSaveSkills = () => {
+    if (skillEditingMember) {
+      updateSkillsMutation.mutate({
+        memberId: skillEditingMember.id,
+        skills: selectedSkills,
+      });
+    }
+  };
+
+  // メンバーのスキルを取得するヘルパー
+  const getMemberSkills = (memberId: number): string[] => {
+    if (!membersWithSkills) return [];
+    const member = membersWithSkills.find(m => m.id === memberId);
+    return member?.skills || [];
   };
 
   return (
@@ -233,6 +303,9 @@ export function Members() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     稼働率
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    担当可能タスク
+                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     操作
                   </th>
@@ -241,7 +314,7 @@ export function Members() {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {membersLoading ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                       読み込み中...
                     </td>
                   </tr>
@@ -278,8 +351,31 @@ export function Members() {
                           )}
                         </div>
                       </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-1">
+                          {getMemberSkills(member.id).length > 0 ? (
+                            getMemberSkills(member.id).map((skill) => (
+                              <span
+                                key={skill}
+                                className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded"
+                              >
+                                {TASK_TYPES[skill as TaskType] || skill}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-sm text-gray-400 dark:text-gray-500">未設定</span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleOpenSkillModal(member)}
+                            className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300"
+                            title="スキル設定"
+                          >
+                            <Settings className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => handleEdit(member)}
                             className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
@@ -304,7 +400,7 @@ export function Members() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                       <Users className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                       <p>メンバーがいません</p>
                       <button
@@ -318,6 +414,54 @@ export function Members() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* スキル設定モーダル */}
+      {showSkillModal && skillEditingMember && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              {skillEditingMember.name} - 担当可能タスク設定
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              このメンバーが担当可能なタスク種別を選択してください。
+            </p>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {Object.entries(TASK_TYPES).map(([key, label]) => (
+                <label
+                  key={key}
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedSkills.includes(key)}
+                    onChange={() => handleSkillToggle(key)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span className="text-gray-900 dark:text-white">{label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => {
+                  setShowSkillModal(false);
+                  setSkillEditingMember(null);
+                }}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleSaveSkills}
+                disabled={updateSkillsMutation.isPending}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {updateSkillsMutation.isPending ? '保存中...' : '保存'}
+              </button>
+            </div>
           </div>
         </div>
       )}

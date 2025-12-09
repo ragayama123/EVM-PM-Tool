@@ -20,3 +20,4 @@ class Member(Base):
     # リレーション
     project = relationship("Project", back_populates="members")
     assigned_tasks = relationship("Task", back_populates="assigned_member")
+    skills = relationship("MemberSkill", back_populates="member", cascade="all, delete-orphan")

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM, Holiday, HolidayCreate, HolidayImportItem, HolidayGenerateRequest, WorkingDaysInfo, HolidayType, ReschedulePreviewResponse, RescheduleResponse } from '../types';
+import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM, MemberWithSkills, Holiday, HolidayCreate, HolidayImportItem, HolidayGenerateRequest, WorkingDaysInfo, HolidayType, ReschedulePreviewResponse, RescheduleResponse, AutoSchedulePreviewResponse, AutoScheduleResponse } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -64,6 +64,7 @@ export const tasksApi = {
       actual_hours: task.actual_hours,
       hourly_rate: task.hourly_rate,
       is_milestone: task.is_milestone ?? false,
+      task_type: task.task_type,
     };
     // 日付フィールドは空でなければISO形式で追加
     if (task.planned_start_date) cleanedTask.planned_start_date = toDateTime(task.planned_start_date);
@@ -96,6 +97,7 @@ export const tasksApi = {
     if (task.parent_id !== undefined) cleanedTask.parent_id = task.parent_id;
     if (task.assigned_member_id !== undefined) cleanedTask.assigned_member_id = task.assigned_member_id;
     if ((task as { is_milestone?: boolean }).is_milestone !== undefined) cleanedTask.is_milestone = (task as { is_milestone?: boolean }).is_milestone;
+    if ((task as { task_type?: string }).task_type !== undefined) cleanedTask.task_type = (task as { task_type?: string }).task_type;
 
     // 日付フィールドは空でなければISO形式で追加
     if (task.planned_start_date) cleanedTask.planned_start_date = toDateTime(task.planned_start_date);
@@ -128,6 +130,22 @@ export const tasksApi = {
     const { data } = await api.post(`/tasks/project/${projectId}/reschedule`, {
       base_task_id: baseTaskId,
       shift_days: shiftDays,
+    });
+    return data;
+  },
+
+  autoSchedulePreview: async (projectId: number, taskIds: number[], startDate: string): Promise<AutoSchedulePreviewResponse> => {
+    const { data } = await api.post(`/tasks/project/${projectId}/auto-schedule/preview`, {
+      task_ids: taskIds,
+      start_date: startDate,
+    });
+    return data;
+  },
+
+  autoSchedule: async (projectId: number, taskIds: number[], startDate: string): Promise<AutoScheduleResponse> => {
+    const { data } = await api.post(`/tasks/project/${projectId}/auto-schedule`, {
+      task_ids: taskIds,
+      start_date: startDate,
     });
     return data;
   },
@@ -194,6 +212,21 @@ export const membersApi = {
 
   getEvmByProject: async (projectId: number): Promise<MemberEVM[]> => {
     const { data } = await api.get(`/members/project/${projectId}/evm`);
+    return data;
+  },
+
+  getWithSkills: async (projectId: number): Promise<MemberWithSkills[]> => {
+    const { data } = await api.get(`/members/project/${projectId}/with-skills`);
+    return data;
+  },
+
+  getSkills: async (memberId: number): Promise<string[]> => {
+    const { data } = await api.get(`/members/${memberId}/skills`);
+    return data;
+  },
+
+  updateSkills: async (memberId: number, taskTypes: string[]): Promise<string[]> => {
+    const { data } = await api.put(`/members/${memberId}/skills`, { task_types: taskTypes });
     return data;
   },
 };

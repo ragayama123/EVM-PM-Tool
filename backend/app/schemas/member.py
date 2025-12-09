@@ -1,6 +1,30 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
+
+
+# タスク種別定義
+TASK_TYPES = [
+    "requirements",      # 要件定義
+    "external_design",   # 外部設計
+    "detailed_design",   # 詳細設計
+    "development",       # PG/UT
+    "ci",                # CI（結合テスト）
+    "it",                # IT（統合テスト）
+    "st",                # ST（システムテスト）
+    "release",           # 本番化
+]
+
+TASK_TYPE_LABELS = {
+    "requirements": "要件定義",
+    "external_design": "外部設計",
+    "detailed_design": "詳細設計",
+    "development": "PG/UT",
+    "ci": "CI",
+    "it": "IT",
+    "st": "ST",
+    "release": "本番化",
+}
 
 
 class MemberBase(BaseModel):
@@ -55,3 +79,16 @@ class MemberEVM(BaseModel):
     cpi: float = 0  # Cost Performance Index
     etc: float = 0  # Estimate to Complete
     eac: float = 0  # Estimate at Completion
+
+
+class MemberSkillUpdate(BaseModel):
+    """メンバースキル更新スキーマ"""
+    task_types: List[str]  # 担当可能タスク種別リスト
+
+
+class MemberWithSkills(MemberResponse):
+    """スキル付きメンバーレスポンススキーマ"""
+    skills: List[str] = []  # 担当可能タスク種別
+
+    class Config:
+        from_attributes = True

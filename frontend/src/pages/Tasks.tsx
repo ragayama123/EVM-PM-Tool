@@ -1,8 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { projectsApi, tasksApi, membersApi } from '../api/client';
-import { ListTodo, Plus, Trash2, Pencil, User, Calendar, X, Flag } from 'lucide-react';
-import type { Task, TaskCreate, ReschedulePreviewResponse } from '../types';
+import { ListTodo, Plus, Trash2, Pencil, User, Calendar, X, Flag, Zap } from 'lucide-react';
+import type { Task, TaskCreate, ReschedulePreviewResponse, AutoSchedulePreviewResponse } from '../types';
+import { TASK_TYPES, type TaskType } from '../types';
 
 // 日付文字列をYYYY-MM-DD形式に変換するヘルパー
 const toDateInput = (dateStr: string | undefined | null): string => {
@@ -15,7 +16,7 @@ export function Tasks() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [formData, setFormData] = useState<Omit<TaskCreate, 'project_id'> & { progress: number; is_milestone: boolean }>({
+  const [formData, setFormData] = useState<Omit<TaskCreate, 'project_id'> & { progress: number; is_milestone: boolean; task_type?: TaskType }>({
     name: '',
     description: '',
     planned_hours: 0,
@@ -28,6 +29,7 @@ export function Tasks() {
     assigned_member_id: undefined,
     progress: 0,
     is_milestone: false,
+    task_type: undefined,
   });
 
   // リスケジュール関連のステート
@@ -37,6 +39,14 @@ export function Tasks() {
   const [previewData, setPreviewData] = useState<ReschedulePreviewResponse | null>(null);
   const [showReschedulePreview, setShowReschedulePreview] = useState(false);
   const [rescheduleError, setRescheduleError] = useState<string | null>(null);
+
+  // 自動スケジュール関連のステート
+  const [autoScheduleMode, setAutoScheduleMode] = useState(false);
+  const [autoScheduleStartDate, setAutoScheduleStartDate] = useState<string>('');
+  const [selectedTasksForAutoSchedule, setSelectedTasksForAutoSchedule] = useState<number[]>([]);
+  const [autoSchedulePreviewData, setAutoSchedulePreviewData] = useState<AutoSchedulePreviewResponse | null>(null);
+  const [showAutoSchedulePreview, setShowAutoSchedulePreview] = useState(false);
+  const [autoScheduleError, setAutoScheduleError] = useState<string | null>(null);
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -90,6 +100,7 @@ export function Tasks() {
       assigned_member_id: undefined,
       progress: 0,
       is_milestone: false,
+      task_type: undefined,
     });
   };
 
@@ -123,6 +134,75 @@ export function Tasks() {
     setPreviewData(null);
     setShowReschedulePreview(false);
     setRescheduleError(null);
+  };
+
+  // 自動スケジュールモードをリセット
+  const resetAutoScheduleMode = () => {
+    setAutoScheduleMode(false);
+    setAutoScheduleStartDate('');
+    setSelectedTasksForAutoSchedule([]);
+    setAutoSchedulePreviewData(null);
+    setShowAutoSchedulePreview(false);
+    setAutoScheduleError(null);
+  };
+
+  // 自動スケジュール対象タスクのトグル
+  const toggleTaskForAutoSchedule = (taskId: number) => {
+    setSelectedTasksForAutoSchedule(prev =>
+      prev.includes(taskId)
+        ? prev.filter(id => id !== taskId)
+        : [...prev, taskId]
+    );
+  };
+
+  // 全タスク選択/解除
+  const toggleAllTasksForAutoSchedule = () => {
+    if (!tasks) return;
+    const eligibleTasks = tasks.filter(t => !t.parent_id && t.task_type);
+    if (selectedTasksForAutoSchedule.length === eligibleTasks.length) {
+      setSelectedTasksForAutoSchedule([]);
+    } else {
+      setSelectedTasksForAutoSchedule(eligibleTasks.map(t => t.id));
+    }
+  };
+
+  // 自動スケジュールプレビュー取得
+  const handlePreviewAutoSchedule = async () => {
+    if (!selectedProjectId || !autoScheduleStartDate || selectedTasksForAutoSchedule.length === 0) return;
+    setAutoScheduleError(null);
+    try {
+      const data = await tasksApi.autoSchedulePreview(
+        selectedProjectId,
+        selectedTasksForAutoSchedule,
+        autoScheduleStartDate
+      );
+      setAutoSchedulePreviewData(data);
+      setShowAutoSchedulePreview(true);
+    } catch (error: unknown) {
+      const err = error as Error & { response?: { data?: { detail?: string } } };
+      setAutoScheduleError(err.response?.data?.detail || 'プレビューの取得に失敗しました');
+    }
+  };
+
+  // 自動スケジュール実行
+  const handleExecuteAutoSchedule = async () => {
+    if (!selectedProjectId || !autoScheduleStartDate || selectedTasksForAutoSchedule.length === 0) return;
+    try {
+      const data = await tasksApi.autoSchedule(
+        selectedProjectId,
+        selectedTasksForAutoSchedule,
+        autoScheduleStartDate
+      );
+      queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['members', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      alert(data.message);
+      resetAutoScheduleMode();
+    } catch (error: unknown) {
+      const err = error as Error & { response?: { data?: { detail?: string } } };
+      setAutoScheduleError(err.response?.data?.detail || '自動スケジュールに失敗しました');
+    }
+    setShowAutoSchedulePreview(false);
   };
 
   // プレビュー取得
@@ -177,6 +257,7 @@ export function Tasks() {
       assigned_member_id: task.assigned_member_id,
       progress: task.progress,
       is_milestone: task.is_milestone || false,
+      task_type: task.task_type,
     });
     setShowForm(true);
   };
@@ -201,10 +282,30 @@ export function Tasks() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
+                if (autoScheduleMode) {
+                  resetAutoScheduleMode();
+                } else {
+                  resetForm();
+                  resetRescheduleMode();
+                  setAutoScheduleMode(true);
+                }
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                autoScheduleMode
+                  ? 'bg-purple-600 text-white hover:bg-purple-700'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500'
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              自動割り当て
+            </button>
+            <button
+              onClick={() => {
                 if (rescheduleMode) {
                   resetRescheduleMode();
                 } else {
                   resetForm();
+                  resetAutoScheduleMode();
                   setRescheduleMode(true);
                 }
               }}
@@ -224,6 +325,7 @@ export function Tasks() {
                 } else {
                   resetForm();
                   resetRescheduleMode();
+                  resetAutoScheduleMode();
                   setShowForm(true);
                 }
               }}
@@ -329,6 +431,78 @@ export function Tasks() {
         </div>
       )}
 
+      {/* 自動スケジュールモード操作パネル */}
+      {autoScheduleMode && selectedProjectId && (
+        <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+          <h3 className="font-semibold text-purple-800 dark:text-purple-200 mb-2">
+            自動割り当てモード
+          </h3>
+          <p className="text-sm text-purple-700 dark:text-purple-300 mb-4">
+            タスク種別とメンバーのスキルに基づいて、担当者と日付を自動設定します。
+            対象タスクを選択し、開始日を指定してください。
+          </p>
+
+          {autoScheduleError && (
+            <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded text-red-700 dark:text-red-300 text-sm">
+              {autoScheduleError}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <label className="text-sm font-medium text-purple-800 dark:text-purple-200">開始日:</label>
+              <input
+                type="date"
+                value={autoScheduleStartDate}
+                onChange={(e) => setAutoScheduleStartDate(e.target.value)}
+                className="px-3 py-2 border border-purple-300 dark:border-purple-600 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium text-purple-800 dark:text-purple-200">
+                選択中: {selectedTasksForAutoSchedule.length}件
+              </span>
+              <button
+                type="button"
+                onClick={toggleAllTasksForAutoSchedule}
+                className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200 underline"
+              >
+                {tasks && selectedTasksForAutoSchedule.length === tasks.filter(t => !t.parent_id && t.task_type).length
+                  ? '全て解除'
+                  : '全て選択（種別設定済みのみ）'}
+              </button>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handlePreviewAutoSchedule}
+                disabled={!autoScheduleStartDate || selectedTasksForAutoSchedule.length === 0}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                プレビュー
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTasksForAutoSchedule([]);
+                  setAutoScheduleStartDate('');
+                  setAutoScheduleError(null);
+                }}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+              >
+                クリア
+              </button>
+            </div>
+
+            <p className="text-sm text-purple-600 dark:text-purple-400 italic">
+              下のタスク一覧からチェックボックスで対象タスクを選択してください（タスク種別が設定されているもののみ）
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* タスク追加・編集フォーム */}
       {showForm && selectedProjectId && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -337,7 +511,7 @@ export function Tasks() {
           </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* 基本情報 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   タスク名 *
@@ -349,6 +523,23 @@ export function Tasks() {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  タスク種別
+                </label>
+                <select
+                  value={formData.task_type || ''}
+                  onChange={(e) => setFormData({ ...formData, task_type: e.target.value ? e.target.value as TaskType : undefined })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="">未設定</option>
+                  {Object.entries(TASK_TYPES).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -526,8 +717,21 @@ export function Tasks() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
+                  {autoScheduleMode && (
+                    <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-10">
+                      <input
+                        type="checkbox"
+                        checked={tasks && selectedTasksForAutoSchedule.length === tasks.filter(t => !t.parent_id && t.task_type).length && selectedTasksForAutoSchedule.length > 0}
+                        onChange={toggleAllTasksForAutoSchedule}
+                        className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500"
+                      />
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     タスク名
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    種別
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     担当者
@@ -555,12 +759,14 @@ export function Tasks() {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {tasksLoading ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={autoScheduleMode ? 10 : 9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                       読み込み中...
                     </td>
                   </tr>
                 ) : tasks && tasks.length > 0 ? (
-                  tasks.map((task) => (
+                  tasks.map((task) => {
+                    const isEligibleForAutoSchedule = !task.parent_id && task.task_type;
+                    return (
                     <tr
                       key={task.id}
                       onClick={() => {
@@ -574,8 +780,21 @@ export function Tasks() {
                         ${rescheduleMode && !task.parent_id && task.planned_start_date && !task.is_milestone ? 'cursor-pointer' : ''}
                         ${selectedTaskForReschedule?.id === task.id ? 'bg-orange-100 dark:bg-orange-900/30' : ''}
                         ${rescheduleMode && (task.parent_id || !task.planned_start_date || task.is_milestone) ? 'opacity-50' : ''}
+                        ${autoScheduleMode && selectedTasksForAutoSchedule.includes(task.id) ? 'bg-purple-100 dark:bg-purple-900/30' : ''}
+                        ${autoScheduleMode && !isEligibleForAutoSchedule ? 'opacity-50' : ''}
                       `}
                     >
+                      {autoScheduleMode && (
+                        <td className="px-2 py-4 whitespace-nowrap text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedTasksForAutoSchedule.includes(task.id)}
+                            onChange={() => toggleTaskForAutoSchedule(task.id)}
+                            disabled={!isEligibleForAutoSchedule}
+                            className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500 disabled:opacity-50"
+                          />
+                        </td>
+                      )}
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           {task.is_milestone ? (
@@ -592,6 +811,15 @@ export function Tasks() {
                             </span>
                           )}
                         </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm">
+                        {task.task_type ? (
+                          <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded">
+                            {TASK_TYPES[task.task_type as TaskType] || task.task_type}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 dark:text-gray-500">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {getMemberName(task.assigned_member_id) ? (
@@ -671,10 +899,11 @@ export function Tasks() {
                         </div>
                       </td>
                     </tr>
-                  ))
+                  );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={autoScheduleMode ? 10 : 9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                       タスクがありません
                     </td>
                   </tr>
@@ -752,6 +981,110 @@ export function Tasks() {
                 className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {rescheduleMutation.isPending ? '実行中...' : '実行'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 自動スケジュールプレビューモーダル */}
+      {showAutoSchedulePreview && autoSchedulePreviewData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden mx-4">
+            <div className="p-4 border-b dark:border-gray-700 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">自動割り当て確認</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {autoSchedulePreviewData.total_count}件のタスクに担当者と日付を設定します
+                  （開始日: {new Date(autoSchedulePreviewData.start_date).toLocaleDateString('ja-JP')}）
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAutoSchedulePreview(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 警告表示 */}
+            {autoSchedulePreviewData.warnings.length > 0 && (
+              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800">
+                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">警告:</p>
+                <ul className="text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside">
+                  {autoSchedulePreviewData.warnings.map((warning, idx) => (
+                    <li key={idx}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="p-4 max-h-[50vh] overflow-y-auto">
+              {autoSchedulePreviewData.tasks.length > 0 ? (
+                <table className="w-full text-sm">
+                  <thead className="text-left text-gray-500 dark:text-gray-400 border-b dark:border-gray-700">
+                    <tr>
+                      <th className="pb-2 font-medium">タスク名</th>
+                      <th className="pb-2 font-medium">種別</th>
+                      <th className="pb-2 font-medium">工数</th>
+                      <th className="pb-2 font-medium">日数</th>
+                      <th className="pb-2 font-medium">担当者</th>
+                      <th className="pb-2 font-medium">開始日</th>
+                      <th className="pb-2 font-medium">終了日</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {autoSchedulePreviewData.tasks.map((task) => (
+                      <tr key={task.id} className="text-gray-900 dark:text-white">
+                        <td className="py-2">{task.name}</td>
+                        <td className="py-2">
+                          {task.task_type ? (
+                            <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded">
+                              {TASK_TYPES[task.task_type as TaskType] || task.task_type}
+                            </span>
+                          ) : '-'}
+                        </td>
+                        <td className="py-2">{task.planned_hours}h</td>
+                        <td className="py-2">{task.calculated_days}日</td>
+                        <td className="py-2">
+                          {task.new_member_name ? (
+                            <span className="text-purple-600 dark:text-purple-400 font-medium">
+                              {task.new_member_name}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">未割当</span>
+                          )}
+                        </td>
+                        <td className="py-2 text-purple-600 dark:text-purple-400 font-medium">
+                          {task.new_start ? new Date(task.new_start).toLocaleDateString('ja-JP') : '-'}
+                        </td>
+                        <td className="py-2 text-purple-600 dark:text-purple-400 font-medium">
+                          {task.new_end ? new Date(task.new_end).toLocaleDateString('ja-JP') : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+                  自動割り当て対象のタスクがありません
+                </p>
+              )}
+            </div>
+
+            <div className="p-4 border-t dark:border-gray-700 flex justify-end gap-2">
+              <button
+                onClick={() => setShowAutoSchedulePreview(false)}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleExecuteAutoSchedule}
+                disabled={autoSchedulePreviewData.total_count === 0}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                実行
               </button>
             </div>
           </div>
