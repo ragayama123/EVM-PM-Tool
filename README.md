@@ -103,6 +103,69 @@ npm run dev
 | EAC | Estimate at Completion | 完成時総コスト見積り |
 | ETC | Estimate to Complete | 残作業コスト見積り |
 
+## Fly.ioへのデプロイ（無料）
+
+Fly.ioを使えば無料でインターネットに公開できます。
+
+### 必要要件
+
+- [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/)
+- Fly.ioアカウント（クレジットカード登録必要、無料枠内なら課金なし）
+
+### 手順
+
+#### 1. Fly CLIのインストールとログイン
+
+```bash
+# macOS
+brew install flyctl
+
+# ログイン
+fly auth login
+```
+
+#### 2. バックエンドのデプロイ
+
+```bash
+cd backend
+
+# アプリ作成（名前を聞かれたらユニークな名前を入力）
+fly launch --no-deploy
+
+# データ永続化用ボリューム作成
+fly volumes create evm_data --region nrt --size 1
+
+# シークレット設定
+fly secrets set SECRET_KEY="$(openssl rand -hex 32)"
+
+# CORS設定（フロントエンドのURLを設定）
+fly secrets set CORS_ORIGINS="https://your-frontend-app.fly.dev"
+
+# デプロイ
+fly deploy
+```
+
+#### 3. フロントエンドのデプロイ
+
+```bash
+cd frontend
+
+# nginx.fly.conf のバックエンドURLを編集
+# wbs-evm-backend.fly.dev → 実際のバックエンドアプリ名に変更
+
+# アプリ作成
+fly launch --no-deploy
+
+# デプロイ
+fly deploy
+```
+
+### 注意事項
+
+- 無料枠: 3つの共有CPU VM + 3GBボリューム
+- 非アクティブ時は自動停止（初回アクセス時に数秒かかる）
+- データはボリュームに永続化されるため、再デプロイしても消えない
+
 ## ライセンス
 
 MIT
