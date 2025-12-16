@@ -5,6 +5,7 @@ import { KPICard } from '../components/KPICard';
 import { EVMChart } from '../components/EVMChart';
 import { StatusBadge } from '../components/StatusBadge';
 import { FolderKanban, AlertCircle } from 'lucide-react';
+import { useProject } from '../contexts/ProjectContext';
 
 // EVM用語の説明（工数ベース）
 const evmTooltips = {
@@ -15,24 +16,31 @@ const evmTooltips = {
 };
 
 export function Dashboard() {
+  const { selectedProjectId, setSelectedProjectId } = useProject();
+
   const { data: projects, isLoading: projectsLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: projectsApi.getAll,
   });
 
-  // 最初のプロジェクトのEVM分析を取得（デモ用）
-  const firstProjectId = projects?.[0]?.id;
+  // プロジェクトが選択されていない場合、最初のプロジェクトを自動選択
+  if (projects && projects.length > 0 && !selectedProjectId) {
+    setSelectedProjectId(projects[0].id);
+  }
+
+  // 選択中のプロジェクト情報
+  const selectedProject = projects?.find(p => p.id === selectedProjectId);
 
   const { data: evmAnalysis } = useQuery({
-    queryKey: ['evm-analysis', firstProjectId],
-    queryFn: () => evmApi.getAnalysis(firstProjectId!),
-    enabled: !!firstProjectId,
+    queryKey: ['evm-analysis', selectedProjectId],
+    queryFn: () => evmApi.getAnalysis(selectedProjectId!),
+    enabled: !!selectedProjectId,
   });
 
   const { data: evmSnapshots } = useQuery({
-    queryKey: ['evm-snapshots', firstProjectId],
-    queryFn: () => evmApi.getSnapshots(firstProjectId!),
-    enabled: !!firstProjectId,
+    queryKey: ['evm-snapshots', selectedProjectId],
+    queryFn: () => evmApi.getSnapshots(selectedProjectId!),
+    enabled: !!selectedProjectId,
   });
 
   if (projectsLoading) {
@@ -45,7 +53,38 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">ダッシュボード</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">ダッシュボード</h2>
+      </div>
+
+      {/* プロジェクト選択 */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          プロジェクト選択
+        </label>
+        <select
+          value={selectedProjectId || ''}
+          onChange={(e) => setSelectedProjectId(Number(e.target.value) || null)}
+          className="w-full md:w-64 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+        >
+          <option value="">プロジェクトを選択...</option>
+          {projects?.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </select>
+        {selectedProject && (
+          <div className="mt-3 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+            <span>
+              期間: {selectedProject.start_date ? new Date(selectedProject.start_date).toLocaleDateString('ja-JP') : '-'} 〜{' '}
+              {selectedProject.end_date ? new Date(selectedProject.end_date).toLocaleDateString('ja-JP') : '-'}
+            </span>
+            <span>計画工数: {selectedProject.budget > 0 ? `${selectedProject.budget.toLocaleString()}h` : '-'}</span>
+            <StatusBadge status={selectedProject.status} />
+          </div>
+        )}
+      </div>
 
       {/* KPIカード */}
       {evmAnalysis ? (

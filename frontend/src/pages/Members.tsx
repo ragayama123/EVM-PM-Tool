@@ -409,7 +409,7 @@ export function Members() {
                       メンバー名
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      稼働可能時間/週
+                      稼働可能時間
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       アサイン工数
@@ -444,7 +444,7 @@ export function Members() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {member.available_hours_per_week}h
+                          {member.total_available_hours}h
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {member.assigned_hours}h

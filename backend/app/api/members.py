@@ -10,6 +10,7 @@ from app.models.member import Member
 from app.models.member_skill import MemberSkill
 from app.models.task import Task
 from app.models.holiday import Holiday
+from app.models.project import Project
 from app.schemas.member import (
     MemberCreate, MemberUpdate, MemberResponse, MemberWithUtilization, MemberEVM,
     MemberSkillUpdate, MemberWithSkills, TASK_TYPES,
@@ -22,6 +23,28 @@ router = APIRouter(prefix="/members", tags=["members"])
 @router.get("/project/{project_id}", response_model=List[MemberWithUtilization])
 def get_members_by_project(project_id: int, db: Session = Depends(get_db)):
     """プロジェクトのメンバー一覧を取得（稼働率付き）"""
+    # プロジェクト情報を取得
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+
+    # プロジェクトの休日を取得
+    holidays = db.query(Holiday.date).filter(
+        Holiday.project_id == project_id
+    ).all()
+    holiday_dates: set = {h.date.date() if isinstance(h.date, datetime) else h.date for h in holidays}
+
+    # プロジェクト期間内の稼働日数を計算
+    project_start = project.start_date.date() if isinstance(project.start_date, datetime) else project.start_date
+    project_end = project.end_date.date() if isinstance(project.end_date, datetime) else project.end_date
+
+    working_days = 0
+    current = project_start
+    while current <= project_end:
+        if current.weekday() < 5 and current not in holiday_dates:  # 平日かつ休日でない
+            working_days += 1
+        current += timedelta(days=1)
+
     members = db.query(Member).filter(Member.project_id == project_id).all()
 
     result = []
@@ -31,10 +54,15 @@ def get_members_by_project(project_id: int, db: Session = Depends(get_db)):
             Task.assigned_member_id == member.id
         ).scalar() or 0
 
-        # 稼働率計算（週あたり稼働可能時間に対する割合）
+        # プロジェクト全期間の稼働可能時間を計算
+        # 1日あたりの稼働可能時間 = 週あたり稼働可能時間 / 5
+        hours_per_day = member.available_hours_per_week / 5
+        total_available_hours = working_days * hours_per_day
+
+        # 稼働率計算（プロジェクト全期間の稼働可能時間に対する割合）
         utilization_rate = 0
-        if member.available_hours_per_week > 0:
-            utilization_rate = (assigned_hours / member.available_hours_per_week) * 100
+        if total_available_hours > 0:
+            utilization_rate = (assigned_hours / total_available_hours) * 100
 
         result.append(MemberWithUtilization(
             id=member.id,
@@ -44,6 +72,7 @@ def get_members_by_project(project_id: int, db: Session = Depends(get_db)):
             created_at=member.created_at,
             updated_at=member.updated_at,
             assigned_hours=assigned_hours,
+            total_available_hours=round(total_available_hours, 1),
             utilization_rate=round(utilization_rate, 1)
         ))
 

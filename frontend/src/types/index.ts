@@ -49,6 +49,7 @@ export interface Member {
 
 export interface MemberWithUtilization extends Member {
   assigned_hours: number;
+  total_available_hours: number;
   utilization_rate: number;
 }
 

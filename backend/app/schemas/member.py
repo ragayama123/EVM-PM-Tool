@@ -60,6 +60,7 @@ class MemberResponse(MemberBase):
 class MemberWithUtilization(MemberResponse):
     """稼働率付きメンバーレスポンススキーマ"""
     assigned_hours: float = 0  # アサインされた工数合計
+    total_available_hours: float = 0  # プロジェクト全期間の稼働可能時間
     utilization_rate: float = 0  # 稼働率（%）
 
     class Config:
