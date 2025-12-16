@@ -1,0 +1,27 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ビルド成果物
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 環境設定
+.env
+.env.local
+.env.*.local
+
+# その他
+.git/
+.gitignore
+*.md
+Dockerfile
+fly.toml
