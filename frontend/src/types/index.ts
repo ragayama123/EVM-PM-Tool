@@ -84,6 +84,7 @@ export interface Task {
   id: number;
   project_id: number;
   parent_id?: number;
+  predecessor_id?: number;  // 先行タスク
   assigned_member_id?: number;
   name: string;
   description?: string;
@@ -107,6 +108,7 @@ export interface Task {
 export interface TaskCreate {
   project_id: number;
   parent_id?: number;
+  predecessor_id?: number;  // 先行タスク
   assigned_member_id?: number;
   name: string;
   description?: string;
@@ -290,4 +292,40 @@ export interface MemberUtilizationDetail {
   available_hours_per_day: number;  // 1日あたりの稼働可能時間
   daily: DailyUtilization[];
   weekly: WeeklyUtilization[];
+}
+
+// WBSインポート関連
+export interface WBSImportError {
+  row: number;
+  message: string;
+}
+
+export interface WBSImportPreviewTask {
+  row: number;
+  wbs_number: string;
+  name: string;
+  task_type?: string;
+  task_type_label?: string;
+  planned_hours: number;
+  planned_start_date?: string;
+  planned_end_date?: string;
+  assigned_member_name?: string;
+  description?: string;
+  is_milestone: boolean;
+  parent_wbs?: string;
+  is_child: boolean;
+}
+
+export interface WBSImportPreviewResponse {
+  success: boolean;
+  errors: WBSImportError[];
+  tasks: WBSImportPreviewTask[];
+  total_count: number;
+}
+
+export interface WBSImportResponse {
+  success: boolean;
+  message: string;
+  errors: WBSImportError[];
+  imported_count: number;
 }

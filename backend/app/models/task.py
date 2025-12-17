@@ -13,6 +13,7 @@ class Task(Base):
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     parent_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
+    predecessor_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)  # 先行タスク
     assigned_member_id = Column(Integer, ForeignKey("members.id"), nullable=True)
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
@@ -44,5 +45,6 @@ class Task(Base):
 
     # リレーション
     project = relationship("Project", back_populates="tasks")
-    parent = relationship("Task", remote_side=[id], backref="children")
+    parent = relationship("Task", remote_side=[id], foreign_keys=[parent_id], backref="children")
+    predecessor = relationship("Task", remote_side=[id], foreign_keys=[predecessor_id], backref="successors")
     assigned_member = relationship("Member", back_populates="assigned_tasks")

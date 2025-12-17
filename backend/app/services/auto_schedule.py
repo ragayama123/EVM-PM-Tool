@@ -130,6 +130,30 @@ class AutoScheduleService:
         member = self.db.query(Member).filter(Member.id == member_id).first()
         return member.name if member else None
 
+    def _sort_tasks_by_dependency(self, tasks: List[Task]) -> List[Task]:
+        """
+        タスクを依存関係（先行タスク）順にソート
+        先行タスクがあるタスクは、先行タスクの後に配置
+        """
+        task_dict = {t.id: t for t in tasks}
+        sorted_tasks = []
+        visited = set()
+        task_ids_in_list = set(t.id for t in tasks)
+
+        def visit(task: Task):
+            if task.id in visited:
+                return
+            # 先行タスクがリスト内にあれば先に処理
+            if task.predecessor_id and task.predecessor_id in task_dict and task.predecessor_id not in visited:
+                visit(task_dict[task.predecessor_id])
+            visited.add(task.id)
+            sorted_tasks.append(task)
+
+        for task in tasks:
+            visit(task)
+
+        return sorted_tasks
+
     def preview(self, task_ids: List[int], start_date: date) -> Dict[str, Any]:
         """
         自動スケジュールのプレビュー
@@ -152,11 +176,17 @@ class AutoScheduleService:
                 Task.parent_id == None  # noqa: E711
             ).order_by(Task.id).all()
 
+        # 依存関係順にソート
+        tasks = self._sort_tasks_by_dependency(tasks)
+
         # 警告メッセージ
         warnings = []
 
         # メンバーごとの次の空き日を管理
         member_next_dates: Dict[int, date] = {}
+
+        # タスクごとの終了日を記録（先行タスク参照用）
+        task_end_dates: Dict[int, date] = {}
 
         # 結果リスト
         result_tasks = []
@@ -186,6 +216,13 @@ class AutoScheduleService:
                 task_start = start_date
                 hours_per_day = 8.0  # デフォルト
 
+            # 先行タスクがあれば、その終了日以降に開始
+            if task.predecessor_id and task.predecessor_id in task_end_dates:
+                predecessor_end = task_end_dates[task.predecessor_id]
+                predecessor_next = self.get_next_working_day(predecessor_end)
+                if predecessor_next > task_start:
+                    task_start = predecessor_next
+
             # 休日を考慮して開始日を調整
             holidays = self._get_holiday_dates()
             while task_start in holidays:
@@ -196,6 +233,9 @@ class AutoScheduleService:
 
             # 終了日を計算
             task_end = self.add_working_days(task_start, task_days)
+
+            # タスクの終了日を記録
+            task_end_dates[task.id] = task_end
 
             # メンバーの次の空き日を更新
             if best_member:

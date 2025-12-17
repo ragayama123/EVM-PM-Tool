@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM, MemberWithSkills, MemberUtilizationDetail, Holiday, HolidayCreate, HolidayImportItem, HolidayGenerateRequest, WorkingDaysInfo, HolidayType, ReschedulePreviewResponse, RescheduleResponse, AutoSchedulePreviewResponse, AutoScheduleResponse } from '../types';
+import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM, MemberWithSkills, MemberUtilizationDetail, Holiday, HolidayCreate, HolidayImportItem, HolidayGenerateRequest, WorkingDaysInfo, HolidayType, ReschedulePreviewResponse, RescheduleResponse, AutoSchedulePreviewResponse, AutoScheduleResponse, WBSImportPreviewResponse, WBSImportResponse } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -58,6 +58,7 @@ export const tasksApi = {
       name: task.name,
       project_id: task.project_id,
       parent_id: task.parent_id,
+      predecessor_id: task.predecessor_id,
       assigned_member_id: task.assigned_member_id,
       description: task.description,
       planned_hours: task.planned_hours,
@@ -95,6 +96,7 @@ export const tasksApi = {
     if (task.hourly_rate !== undefined) cleanedTask.hourly_rate = task.hourly_rate;
     if (task.progress !== undefined) cleanedTask.progress = task.progress;
     if (task.parent_id !== undefined) cleanedTask.parent_id = task.parent_id;
+    if ((task as { predecessor_id?: number }).predecessor_id !== undefined) cleanedTask.predecessor_id = (task as { predecessor_id?: number }).predecessor_id;
     if (task.assigned_member_id !== undefined) cleanedTask.assigned_member_id = task.assigned_member_id;
     if ((task as { is_milestone?: boolean }).is_milestone !== undefined) cleanedTask.is_milestone = (task as { is_milestone?: boolean }).is_milestone;
     if ((task as { task_type?: string }).task_type !== undefined) cleanedTask.task_type = (task as { task_type?: string }).task_type;
@@ -146,6 +148,31 @@ export const tasksApi = {
     const { data } = await api.post(`/tasks/project/${projectId}/auto-schedule`, {
       task_ids: taskIds,
       start_date: startDate,
+    });
+    return data;
+  },
+
+  downloadTemplate: async (projectId: number): Promise<Blob> => {
+    const { data } = await api.get(`/tasks/project/${projectId}/template`, {
+      responseType: 'blob',
+    });
+    return data;
+  },
+
+  importExcelPreview: async (projectId: number, file: File): Promise<WBSImportPreviewResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await api.post(`/tasks/project/${projectId}/import-excel/preview`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+
+  importExcel: async (projectId: number, file: File): Promise<WBSImportResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await api.post(`/tasks/project/${projectId}/import-excel`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return data;
   },

@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { projectsApi, tasksApi, membersApi } from '../api/client';
-import { ListTodo, Plus, Trash2, Pencil, User, Calendar, X, Flag, Zap } from 'lucide-react';
+import { ListTodo, Plus, Trash2, Pencil, User, Calendar, X, Flag, Zap, FileSpreadsheet } from 'lucide-react';
 import type { Task, TaskCreate, ReschedulePreviewResponse, AutoSchedulePreviewResponse } from '../types';
 import { TASK_TYPES, type TaskType } from '../types';
 import { useProject } from '../contexts/ProjectContext';
+import { WBSImportModal } from '../components/WBSImportModal';
 
 // 日付文字列をYYYY-MM-DD形式に変換するヘルパー
 const toDateInput = (dateStr: string | undefined | null): string => {
@@ -17,7 +18,7 @@ export function Tasks() {
   const { selectedProjectId, setSelectedProjectId } = useProject();
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [formData, setFormData] = useState<Omit<TaskCreate, 'project_id'> & { progress: number; is_milestone: boolean; task_type?: TaskType }>({
+  const [formData, setFormData] = useState<Omit<TaskCreate, 'project_id'> & { progress: number; is_milestone: boolean; task_type?: TaskType; parent_id?: number; predecessor_id?: number }>({
     name: '',
     description: '',
     planned_hours: 0,
@@ -31,6 +32,8 @@ export function Tasks() {
     progress: 0,
     is_milestone: false,
     task_type: undefined,
+    parent_id: undefined,
+    predecessor_id: undefined,
   });
 
   // リスケジュール関連のステート
@@ -48,6 +51,9 @@ export function Tasks() {
   const [autoSchedulePreviewData, setAutoSchedulePreviewData] = useState<AutoSchedulePreviewResponse | null>(null);
   const [showAutoSchedulePreview, setShowAutoSchedulePreview] = useState(false);
   const [autoScheduleError, setAutoScheduleError] = useState<string | null>(null);
+
+  // WBSインポートモーダル
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -102,6 +108,8 @@ export function Tasks() {
       progress: 0,
       is_milestone: false,
       task_type: undefined,
+      parent_id: undefined,
+      predecessor_id: undefined,
     });
   };
 
@@ -259,6 +267,8 @@ export function Tasks() {
       progress: task.progress,
       is_milestone: task.is_milestone || false,
       task_type: task.task_type,
+      parent_id: task.parent_id,
+      predecessor_id: task.predecessor_id,
     });
     setShowForm(true);
   };
@@ -269,6 +279,41 @@ export function Tasks() {
     const member = members.find(m => m.id === memberId);
     return member ? member.name : null;
   };
+
+  // タスクIDから名前を取得（先行タスク表示用）
+  const getTaskName = (taskId: number | undefined): string | null => {
+    if (!taskId || !tasks) return null;
+    const task = tasks.find(t => t.id === taskId);
+    return task ? task.name : null;
+  };
+
+  // タスクを階層構造でソート
+  const getHierarchicalTasks = (taskList: Task[] | undefined): (Task & { isChild: boolean })[] => {
+    if (!taskList) return [];
+
+    const result: (Task & { isChild: boolean })[] = [];
+    const parentTasks = taskList.filter(t => !t.parent_id);
+
+    parentTasks.forEach(parent => {
+      result.push({ ...parent, isChild: false });
+      const children = taskList.filter(t => t.parent_id === parent.id);
+      children.forEach(child => {
+        result.push({ ...child, isChild: true });
+      });
+    });
+
+    // 親が見つからない子タスクも追加（孤立タスク）
+    const addedIds = new Set(result.map(t => t.id));
+    taskList.forEach(t => {
+      if (!addedIds.has(t.id)) {
+        result.push({ ...t, isChild: !!t.parent_id });
+      }
+    });
+
+    return result;
+  };
+
+  const hierarchicalTasks = getHierarchicalTasks(tasks);
 
   // 最初のプロジェクトを自動選択
   if (projects && projects.length > 0 && !selectedProjectId) {
@@ -281,6 +326,13 @@ export function Tasks() {
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">WBS</h2>
         {selectedProjectId && (
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Excelインポート
+            </button>
             <button
               onClick={() => {
                 if (autoScheduleMode) {
@@ -512,7 +564,7 @@ export function Tasks() {
           </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* 基本情報 */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   タスク名 *
@@ -524,6 +576,23 @@ export function Tasks() {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  先行タスク
+                </label>
+                <select
+                  value={formData.predecessor_id || ''}
+                  onChange={(e) => setFormData({ ...formData, predecessor_id: e.target.value ? Number(e.target.value) : undefined })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="">なし</option>
+                  {tasks?.filter(t => t.id !== editingTask?.id).map((task) => (
+                    <option key={task.id} value={task.id}>
+                      {task.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -732,6 +801,9 @@ export function Tasks() {
                     タスク名
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    先行タスク
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     種別
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -760,12 +832,12 @@ export function Tasks() {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {tasksLoading ? (
                   <tr>
-                    <td colSpan={autoScheduleMode ? 10 : 9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={autoScheduleMode ? 11 : 10} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                       読み込み中...
                     </td>
                   </tr>
-                ) : tasks && tasks.length > 0 ? (
-                  tasks.map((task) => {
+                ) : hierarchicalTasks.length > 0 ? (
+                  hierarchicalTasks.map((task) => {
                     const isEligibleForAutoSchedule = !task.parent_id && task.task_type;
                     return (
                     <tr
@@ -798,12 +870,15 @@ export function Tasks() {
                       )}
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
+                          {task.isChild && (
+                            <span className="text-gray-400 dark:text-gray-500 ml-2">└</span>
+                          )}
                           {task.is_milestone ? (
                             <Flag className="w-4 h-4 text-orange-500" />
                           ) : (
-                            <ListTodo className="w-4 h-4 text-gray-400" />
+                            <ListTodo className={`w-4 h-4 ${task.isChild ? 'text-gray-300 dark:text-gray-600' : 'text-gray-400'}`} />
                           )}
-                          <span className={`font-medium ${task.is_milestone ? 'text-orange-600 dark:text-orange-400' : 'text-gray-900 dark:text-white'}`}>
+                          <span className={`font-medium ${task.is_milestone ? 'text-orange-600 dark:text-orange-400' : task.isChild ? 'text-gray-600 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`}>
                             {task.name}
                           </span>
                           {task.is_milestone && (
@@ -812,6 +887,9 @@ export function Tasks() {
                             </span>
                           )}
                         </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {getTaskName(task.predecessor_id) || '-'}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm">
                         {task.task_type ? (
@@ -904,7 +982,7 @@ export function Tasks() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={autoScheduleMode ? 10 : 9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={autoScheduleMode ? 11 : 10} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                       タスクがありません
                     </td>
                   </tr>
@@ -1090,6 +1168,14 @@ export function Tasks() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* WBSインポートモーダル */}
+      {showImportModal && selectedProjectId && (
+        <WBSImportModal
+          projectId={selectedProjectId}
+          onClose={() => setShowImportModal(false)}
+        />
       )}
     </div>
   );

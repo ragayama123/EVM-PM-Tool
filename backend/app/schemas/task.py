@@ -24,6 +24,7 @@ class TaskCreate(TaskBase):
     """タスク作成スキーマ"""
     project_id: int
     parent_id: Optional[int] = None
+    predecessor_id: Optional[int] = None  # 先行タスク
     assigned_member_id: Optional[int] = None
 
 
@@ -42,6 +43,7 @@ class TaskUpdate(BaseModel):
     actual_start_date: Optional[datetime] = None
     actual_end_date: Optional[datetime] = None
     parent_id: Optional[int] = None
+    predecessor_id: Optional[int] = None  # 先行タスク
     assigned_member_id: Optional[int] = None
 
 
@@ -50,6 +52,7 @@ class TaskResponse(TaskBase):
     id: int
     project_id: int
     parent_id: Optional[int] = None
+    predecessor_id: Optional[int] = None  # 先行タスク
     assigned_member_id: Optional[int] = None
     progress: float = 0
     created_at: datetime
@@ -145,3 +148,43 @@ class AutoScheduleResponse(BaseModel):
     message: str
     updated_count: int
     updated_tasks: List[AutoSchedulePreviewTask]
+
+
+# WBSインポート関連スキーマ
+class WBSImportError(BaseModel):
+    """インポートエラー"""
+    row: int
+    message: str
+
+
+class WBSImportPreviewTask(BaseModel):
+    """インポートプレビュー用タスク情報"""
+    row: int
+    wbs_number: str
+    name: str
+    task_type: Optional[str] = None
+    task_type_label: Optional[str] = None
+    planned_hours: float
+    planned_start_date: Optional[str] = None
+    planned_end_date: Optional[str] = None
+    assigned_member_name: Optional[str] = None
+    description: Optional[str] = None
+    is_milestone: bool = False
+    parent_wbs: Optional[str] = None
+    is_child: bool = False
+
+
+class WBSImportPreviewResponse(BaseModel):
+    """インポートプレビューレスポンス"""
+    success: bool
+    errors: List[WBSImportError]
+    tasks: List[WBSImportPreviewTask]
+    total_count: int
+
+
+class WBSImportResponse(BaseModel):
+    """インポート実行結果"""
+    success: bool
+    message: str
+    errors: List[WBSImportError]
+    imported_count: int

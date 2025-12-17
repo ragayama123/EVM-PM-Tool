@@ -1,5 +1,6 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -15,9 +16,12 @@ from app.schemas.task import (
     AutoScheduleRequest,
     AutoSchedulePreviewResponse,
     AutoScheduleResponse,
+    WBSImportPreviewResponse,
+    WBSImportResponse,
 )
 from app.services.reschedule import RescheduleService
 from app.services.auto_schedule import AutoScheduleService
+from app.services.wbs_import import WBSImportService
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -292,5 +296,98 @@ def execute_auto_schedule(
 
     # プロジェクト期間を自動更新
     update_project_dates(db, project_id)
+
+    return result
+
+
+@router.get("/project/{project_id}/template")
+def download_wbs_template(
+    project_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    WBSインポート用Excelテンプレートをダウンロード
+    プロジェクトのメンバー情報を含むテンプレートを生成
+    """
+    # プロジェクト存在確認
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+
+    service = WBSImportService(db, project_id)
+    excel_content = service.generate_template()
+
+    return StreamingResponse(
+        excel_content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename=wbs_template_{project_id}.xlsx"
+        }
+    )
+
+
+@router.post("/project/{project_id}/import-excel/preview", response_model=WBSImportPreviewResponse)
+async def preview_wbs_import(
+    project_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    WBSインポートのプレビュー
+    実際のインポートは行わず、バリデーション結果とプレビューを返す
+    """
+    # プロジェクト存在確認
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+
+    # ファイル形式チェック
+    if not file.filename or not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=400,
+            detail="Excelファイル（.xlsx, .xls）をアップロードしてください"
+        )
+
+    # ファイル内容を読み込み
+    content = await file.read()
+
+    service = WBSImportService(db, project_id)
+    result = service.preview(content)
+
+    return result
+
+
+@router.post("/project/{project_id}/import-excel", response_model=WBSImportResponse)
+async def execute_wbs_import(
+    project_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    WBSインポート実行
+    既存のタスクを全て削除し、Excelからタスクを一括作成
+    """
+    # プロジェクト存在確認
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+
+    # ファイル形式チェック
+    if not file.filename or not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=400,
+            detail="Excelファイル（.xlsx, .xls）をアップロードしてください"
+        )
+
+    # ファイル内容を読み込み
+    content = await file.read()
+
+    service = WBSImportService(db, project_id)
+    result = service.execute_import(content)
+
+    # インポート成功時はプロジェクト期間を更新
+    if result["success"]:
+        update_project_dates(db, project_id)
+        update_project_status(db, project_id)
 
     return result

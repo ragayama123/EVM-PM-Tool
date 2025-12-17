@@ -59,6 +59,29 @@ class RescheduleService:
 
         return current
 
+    def get_successor_tasks(self, task_id: int, visited: Optional[Set[int]] = None) -> List[Task]:
+        """
+        後続タスク（このタスクを先行タスクとしているタスク）を再帰的に取得
+        """
+        if visited is None:
+            visited = set()
+
+        successors = []
+        direct_successors = self.db.query(Task).filter(
+            Task.predecessor_id == task_id,
+            Task.project_id == self.project_id,
+            Task.is_milestone == False  # noqa: E712
+        ).all()
+
+        for task in direct_successors:
+            if task.id not in visited:
+                visited.add(task.id)
+                successors.append(task)
+                # 再帰的に後続タスクを取得
+                successors.extend(self.get_successor_tasks(task.id, visited))
+
+        return successors
+
     def get_target_tasks(self, base_task_id: int) -> List[Task]:
         """
         リスケ対象タスクを取得
@@ -68,6 +91,7 @@ class RescheduleService:
         - is_milestone = True のタスクは除外（固定日付）
         - 予定開始日順でソート
         - base_task自身は除外
+        - base_taskを先行タスクとしているタスク（後続タスク）も対象
         """
         base_task = self.db.query(Task).filter(Task.id == base_task_id).first()
         if not base_task or not base_task.planned_start_date:
@@ -81,7 +105,7 @@ class RescheduleService:
         # base_taskの予定開始日以降のタスク
         # base_task自身は除外
         # マイルストーン（固定日付）は除外
-        return self.db.query(Task).filter(
+        date_based_tasks = self.db.query(Task).filter(
             Task.project_id == self.project_id,
             Task.parent_id == None,  # noqa: E711
             Task.planned_start_date != None,  # noqa: E711
@@ -89,6 +113,22 @@ class RescheduleService:
             Task.id != base_task_id,
             Task.is_milestone == False  # noqa: E712
         ).order_by(Task.planned_start_date).all()
+
+        # 後続タスク（base_taskを先行タスクとしているタスク）も追加
+        successor_tasks = self.get_successor_tasks(base_task_id)
+
+        # 重複除去して結合
+        task_ids = set(t.id for t in date_based_tasks)
+        combined_tasks = list(date_based_tasks)
+        for task in successor_tasks:
+            if task.id not in task_ids and task.parent_id is None:
+                combined_tasks.append(task)
+                task_ids.add(task.id)
+
+        # 予定開始日順でソート
+        combined_tasks.sort(key=lambda t: t.planned_start_date or datetime.max)
+
+        return combined_tasks
 
     def get_children(self, parent_id: int) -> List[Task]:
         """子タスクを取得"""
