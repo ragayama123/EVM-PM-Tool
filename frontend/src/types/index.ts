@@ -294,6 +294,9 @@ export interface MemberUtilizationDetail {
   weekly: WeeklyUtilization[];
 }
 
+// WBSソート種類
+export type WBSSortType = 'default' | 'assignee' | 'date';
+
 // WBSインポート関連
 export interface WBSImportError {
   row: number;

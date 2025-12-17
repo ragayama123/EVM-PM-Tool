@@ -1,9 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { projectsApi, tasksApi, membersApi } from '../api/client';
-import { ListTodo, Plus, Trash2, Pencil, User, Calendar, X, Flag, Zap, FileSpreadsheet } from 'lucide-react';
-import type { Task, TaskCreate, ReschedulePreviewResponse, AutoSchedulePreviewResponse } from '../types';
+import { ListTodo, Plus, Trash2, Pencil, User, Calendar, X, Flag, Zap, FileSpreadsheet, ArrowUpDown } from 'lucide-react';
+import type { Task, TaskCreate, ReschedulePreviewResponse, AutoSchedulePreviewResponse, WBSSortType } from '../types';
 import { TASK_TYPES, type TaskType } from '../types';
+
+// タスク種別のソート順序（デフォルト）
+const TASK_TYPE_ORDER: Record<string, number> = {
+  requirements: 0,
+  external_design: 1,
+  detailed_design: 2,
+  pg: 3,
+  ci: 4,
+  ut: 5,
+  it: 6,
+  st: 7,
+  release: 8,
+};
 import { useProject } from '../contexts/ProjectContext';
 import { WBSImportModal } from '../components/WBSImportModal';
 
@@ -54,6 +67,9 @@ export function Tasks() {
 
   // WBSインポートモーダル
   const [showImportModal, setShowImportModal] = useState(false);
+
+  // ソート設定
+  const [sortType, setSortType] = useState<WBSSortType>('default');
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -287,6 +303,143 @@ export function Tasks() {
     return task ? task.name : null;
   };
 
+  // 担当者名でソート用の比較（あいうえお順）
+  const getMemberNameForSort = (memberId: number | undefined): string => {
+    if (!memberId || !members) return '\uffff'; // 未割当は最後に
+    const member = members.find(m => m.id === memberId);
+    return member ? member.name : '\uffff';
+  };
+
+  // タスク種別のソート順を取得
+  const getTaskTypeOrder = (taskType: string | undefined): number => {
+    if (!taskType) return 999; // 未設定は最後に
+    return TASK_TYPE_ORDER[taskType] ?? 999;
+  };
+
+  // 予定開始日でソート用の比較
+  const getPlannedStartDate = (task: Task): string => {
+    return task.planned_start_date || '\uffff'; // 未設定は最後に
+  };
+
+  // 先行タスクを考慮したソート順序を計算
+  const getPredecessorOrder = (task: Task, taskList: Task[]): number[] => {
+    const order: number[] = [];
+    let currentTask: Task | undefined = task;
+    const visited = new Set<number>();
+
+    while (currentTask && !visited.has(currentTask.id)) {
+      visited.add(currentTask.id);
+      order.unshift(currentTask.id);
+      if (currentTask.predecessor_id) {
+        currentTask = taskList.find(t => t.id === currentTask!.predecessor_id);
+      } else {
+        break;
+      }
+    }
+    return order;
+  };
+
+  // 先行タスク順の比較関数
+  const comparePredecessorOrder = (a: Task, b: Task, taskList: Task[]): number => {
+    const orderA = getPredecessorOrder(a, taskList);
+    const orderB = getPredecessorOrder(b, taskList);
+
+    // 配列を比較
+    const minLen = Math.min(orderA.length, orderB.length);
+    for (let i = 0; i < minLen; i++) {
+      if (orderA[i] !== orderB[i]) {
+        // 同じ階層で異なるタスクの場合、IDで比較
+        return orderA[i] - orderB[i];
+      }
+    }
+    // 片方が先行タスクチェーンの途中にある場合
+    return orderA.length - orderB.length;
+  };
+
+  // タスクをソート
+  const sortTasks = (taskList: Task[]): Task[] => {
+    if (!taskList || taskList.length === 0) return [];
+
+    const sorted = [...taskList];
+
+    switch (sortType) {
+      case 'default':
+        // ①種別 → ②先行/後行タスク → ③予定開始日 → ④担当者
+        sorted.sort((a, b) => {
+          // ①種別
+          const typeOrderA = getTaskTypeOrder(a.task_type);
+          const typeOrderB = getTaskTypeOrder(b.task_type);
+          if (typeOrderA !== typeOrderB) return typeOrderA - typeOrderB;
+
+          // ②先行/後行タスク
+          const predOrder = comparePredecessorOrder(a, b, taskList);
+          if (predOrder !== 0) return predOrder;
+
+          // ③予定開始日
+          const dateA = getPlannedStartDate(a);
+          const dateB = getPlannedStartDate(b);
+          if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+          // ④担当者（あいうえお順）
+          const memberA = getMemberNameForSort(a.assigned_member_id);
+          const memberB = getMemberNameForSort(b.assigned_member_id);
+          return memberA.localeCompare(memberB, 'ja');
+        });
+        break;
+
+      case 'assignee':
+        // ①担当者 → ②種別 → ③先行/後行タスク → ④予定開始日
+        sorted.sort((a, b) => {
+          // ①担当者（あいうえお順）
+          const memberA = getMemberNameForSort(a.assigned_member_id);
+          const memberB = getMemberNameForSort(b.assigned_member_id);
+          const memberCompare = memberA.localeCompare(memberB, 'ja');
+          if (memberCompare !== 0) return memberCompare;
+
+          // ②種別
+          const typeOrderA = getTaskTypeOrder(a.task_type);
+          const typeOrderB = getTaskTypeOrder(b.task_type);
+          if (typeOrderA !== typeOrderB) return typeOrderA - typeOrderB;
+
+          // ③先行/後行タスク
+          const predOrder = comparePredecessorOrder(a, b, taskList);
+          if (predOrder !== 0) return predOrder;
+
+          // ④予定開始日
+          const dateA = getPlannedStartDate(a);
+          const dateB = getPlannedStartDate(b);
+          return dateA.localeCompare(dateB);
+        });
+        break;
+
+      case 'date':
+        // ①予定開始日 → ②種別 → ③先行/後行タスク → ④担当者
+        sorted.sort((a, b) => {
+          // ①予定開始日
+          const dateA = getPlannedStartDate(a);
+          const dateB = getPlannedStartDate(b);
+          if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+          // ②種別
+          const typeOrderA = getTaskTypeOrder(a.task_type);
+          const typeOrderB = getTaskTypeOrder(b.task_type);
+          if (typeOrderA !== typeOrderB) return typeOrderA - typeOrderB;
+
+          // ③先行/後行タスク
+          const predOrder = comparePredecessorOrder(a, b, taskList);
+          if (predOrder !== 0) return predOrder;
+
+          // ④担当者（あいうえお順）
+          const memberA = getMemberNameForSort(a.assigned_member_id);
+          const memberB = getMemberNameForSort(b.assigned_member_id);
+          return memberA.localeCompare(memberB, 'ja');
+        });
+        break;
+    }
+
+    return sorted;
+  };
+
   // タスクを階層構造でソート
   const getHierarchicalTasks = (taskList: Task[] | undefined): (Task & { isChild: boolean })[] => {
     if (!taskList) return [];
@@ -294,10 +447,15 @@ export function Tasks() {
     const result: (Task & { isChild: boolean })[] = [];
     const parentTasks = taskList.filter(t => !t.parent_id);
 
-    parentTasks.forEach(parent => {
+    // 親タスクをソート
+    const sortedParents = sortTasks(parentTasks);
+
+    sortedParents.forEach(parent => {
       result.push({ ...parent, isChild: false });
+      // 子タスクもソート
       const children = taskList.filter(t => t.parent_id === parent.id);
-      children.forEach(child => {
+      const sortedChildren = sortTasks(children);
+      sortedChildren.forEach(child => {
         result.push({ ...child, isChild: true });
       });
     });
@@ -391,23 +549,45 @@ export function Tasks() {
         )}
       </div>
 
-      {/* プロジェクト選択 */}
+      {/* プロジェクト選択・ソート */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          プロジェクト選択
-        </label>
-        <select
-          value={selectedProjectId || ''}
-          onChange={(e) => setSelectedProjectId(Number(e.target.value) || null)}
-          className="w-full md:w-64 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-        >
-          <option value="">プロジェクトを選択...</option>
-          {projects?.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-end gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              プロジェクト選択
+            </label>
+            <select
+              value={selectedProjectId || ''}
+              onChange={(e) => setSelectedProjectId(Number(e.target.value) || null)}
+              className="w-full md:w-64 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="">プロジェクトを選択...</option>
+              {projects?.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedProjectId && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <ArrowUpDown className="w-4 h-4 inline mr-1" />
+                並び順
+              </label>
+              <select
+                value={sortType}
+                onChange={(e) => setSortType(e.target.value as WBSSortType)}
+                className="w-full md:w-48 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="default">デフォルト（種別順）</option>
+                <option value="assignee">担当者順</option>
+                <option value="date">日付順</option>
+              </select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* リスケジュールモード操作パネル */}
