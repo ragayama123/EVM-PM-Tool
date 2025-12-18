@@ -287,6 +287,8 @@ export function Tasks() {
       predecessor_id: task.predecessor_id,
     });
     setShowForm(true);
+    // 編集フォームが表示される画面上部に自動スクロール
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // メンバーIDから名前を取得
