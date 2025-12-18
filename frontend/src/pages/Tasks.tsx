@@ -183,7 +183,7 @@ export function Tasks() {
   // 全タスク選択/解除
   const toggleAllTasksForAutoSchedule = () => {
     if (!tasks) return;
-    const eligibleTasks = tasks.filter(t => !t.parent_id && t.task_type);
+    const eligibleTasks = tasks.filter(t => t.task_type);
     if (selectedTasksForAutoSchedule.length === eligibleTasks.length) {
       setSelectedTasksForAutoSchedule([]);
     } else {
@@ -302,6 +302,96 @@ export function Tasks() {
     const task = tasks.find(t => t.id === taskId);
     return task ? task.name : null;
   };
+
+  // フェーズ（タスク種別）ごとのサマリーを計算
+  type PhaseSummary = {
+    taskType: string;
+    label: string;
+    plannedStartDate: string | null;
+    plannedEndDate: string | null;
+    plannedHours: number;
+    actualStartDate: string | null;
+    actualEndDate: string | null;
+    actualHours: number;
+    progress: number; // 加重平均
+    taskCount: number;
+  };
+
+  const getPhaseSummaries = (): PhaseSummary[] => {
+    if (!tasks) return [];
+
+    const summaryMap = new Map<string, {
+      tasks: Task[];
+      plannedStartDates: string[];
+      plannedEndDates: string[];
+      actualStartDates: string[];
+      actualEndDates: string[];
+    }>();
+
+    // タスクをフェーズごとにグループ化
+    tasks.forEach(task => {
+      if (!task.task_type) return;
+
+      if (!summaryMap.has(task.task_type)) {
+        summaryMap.set(task.task_type, {
+          tasks: [],
+          plannedStartDates: [],
+          plannedEndDates: [],
+          actualStartDates: [],
+          actualEndDates: [],
+        });
+      }
+
+      const group = summaryMap.get(task.task_type)!;
+      group.tasks.push(task);
+      if (task.planned_start_date) group.plannedStartDates.push(task.planned_start_date);
+      if (task.planned_end_date) group.plannedEndDates.push(task.planned_end_date);
+      if (task.actual_start_date) group.actualStartDates.push(task.actual_start_date);
+      if (task.actual_end_date) group.actualEndDates.push(task.actual_end_date);
+    });
+
+    // サマリーを生成
+    const summaries: PhaseSummary[] = [];
+    summaryMap.forEach((group, taskType) => {
+      const plannedHours = group.tasks.reduce((sum, t) => sum + t.planned_hours, 0);
+      const actualHours = group.tasks.reduce((sum, t) => sum + t.actual_hours, 0);
+
+      // 進捗率は工数で加重平均
+      let progress = 0;
+      if (plannedHours > 0) {
+        const weightedProgress = group.tasks.reduce((sum, t) => sum + t.planned_hours * t.progress, 0);
+        progress = Math.round(weightedProgress / plannedHours);
+      }
+
+      summaries.push({
+        taskType,
+        label: TASK_TYPES[taskType as TaskType] || taskType,
+        plannedStartDate: group.plannedStartDates.length > 0
+          ? group.plannedStartDates.sort()[0]
+          : null,
+        plannedEndDate: group.plannedEndDates.length > 0
+          ? group.plannedEndDates.sort().reverse()[0]
+          : null,
+        plannedHours,
+        actualStartDate: group.actualStartDates.length > 0
+          ? group.actualStartDates.sort()[0]
+          : null,
+        actualEndDate: group.actualEndDates.length > 0
+          ? group.actualEndDates.sort().reverse()[0]
+          : null,
+        actualHours,
+        progress,
+        taskCount: group.tasks.length,
+      });
+    });
+
+    // タスク種別の順序でソート
+    return summaries.sort((a, b) =>
+      (TASK_TYPE_ORDER[a.taskType] ?? 999) - (TASK_TYPE_ORDER[b.taskType] ?? 999)
+    );
+  };
+
+  const phaseSummaries = getPhaseSummaries();
 
   // 担当者名でソート用の比較（あいうえお順）
   const getMemberNameForSort = (memberId: number | undefined): string => {
@@ -440,38 +530,8 @@ export function Tasks() {
     return sorted;
   };
 
-  // タスクを階層構造でソート
-  const getHierarchicalTasks = (taskList: Task[] | undefined): (Task & { isChild: boolean })[] => {
-    if (!taskList) return [];
-
-    const result: (Task & { isChild: boolean })[] = [];
-    const parentTasks = taskList.filter(t => !t.parent_id);
-
-    // 親タスクをソート
-    const sortedParents = sortTasks(parentTasks);
-
-    sortedParents.forEach(parent => {
-      result.push({ ...parent, isChild: false });
-      // 子タスクもソート
-      const children = taskList.filter(t => t.parent_id === parent.id);
-      const sortedChildren = sortTasks(children);
-      sortedChildren.forEach(child => {
-        result.push({ ...child, isChild: true });
-      });
-    });
-
-    // 親が見つからない子タスクも追加（孤立タスク）
-    const addedIds = new Set(result.map(t => t.id));
-    taskList.forEach(t => {
-      if (!addedIds.has(t.id)) {
-        result.push({ ...t, isChild: !!t.parent_id });
-      }
-    });
-
-    return result;
-  };
-
-  const hierarchicalTasks = getHierarchicalTasks(tasks);
+  // タスクをソートして返す（フラット表示）
+  const sortedTasks = sortTasks(tasks || []);
 
   // 最初のプロジェクトを自動選択
   if (projects && projects.length > 0 && !selectedProjectId) {
@@ -701,7 +761,7 @@ export function Tasks() {
                 onClick={toggleAllTasksForAutoSchedule}
                 className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200 underline"
               >
-                {tasks && selectedTasksForAutoSchedule.length === tasks.filter(t => !t.parent_id && t.task_type).length
+                {tasks && selectedTasksForAutoSchedule.length === tasks.filter(t => t.task_type).length
                   ? '全て解除'
                   : '全て選択（種別設定済みのみ）'}
               </button>
@@ -960,6 +1020,85 @@ export function Tasks() {
         </div>
       )}
 
+      {/* フェーズサマリー */}
+      {selectedProjectId && phaseSummaries.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">フェーズサマリー</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">フェーズ</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">タスク数</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">予定期間</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">予定工数</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">実績期間</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">実績工数</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">進捗率</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {phaseSummaries.map((phase) => (
+                  <tr key={phase.taskType} className="bg-blue-50 dark:bg-blue-900/20">
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded">
+                        {phase.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                      {phase.taskCount}件
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                      {phase.plannedStartDate && phase.plannedEndDate ? (
+                        <span className="text-xs">
+                          {new Date(phase.plannedStartDate).toLocaleDateString('ja-JP')} 〜 {new Date(phase.plannedEndDate).toLocaleDateString('ja-JP')}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+                      {phase.plannedHours}h
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                      {phase.actualStartDate || phase.actualEndDate ? (
+                        <span className="text-xs">
+                          {phase.actualStartDate ? new Date(phase.actualStartDate).toLocaleDateString('ja-JP') : '-'} 〜 {phase.actualEndDate ? new Date(phase.actualEndDate).toLocaleDateString('ja-JP') : '-'}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200">
+                      {phase.actualHours}h
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full ${
+                              phase.progress >= 100 ? 'bg-green-500' :
+                              phase.progress >= 50 ? 'bg-blue-500' :
+                              phase.progress > 0 ? 'bg-yellow-500' : 'bg-gray-300'
+                            }`}
+                            style={{ width: `${Math.min(phase.progress, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-sm text-gray-600 dark:text-gray-300 w-10">
+                          {phase.progress}%
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* タスク一覧 */}
       {selectedProjectId && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
@@ -971,7 +1110,7 @@ export function Tasks() {
                     <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-10">
                       <input
                         type="checkbox"
-                        checked={tasks && selectedTasksForAutoSchedule.length === tasks.filter(t => !t.parent_id && t.task_type).length && selectedTasksForAutoSchedule.length > 0}
+                        checked={tasks && selectedTasksForAutoSchedule.length === tasks.filter(t => t.task_type).length && selectedTasksForAutoSchedule.length > 0}
                         onChange={toggleAllTasksForAutoSchedule}
                         className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500"
                       />
@@ -1016,23 +1155,23 @@ export function Tasks() {
                       読み込み中...
                     </td>
                   </tr>
-                ) : hierarchicalTasks.length > 0 ? (
-                  hierarchicalTasks.map((task) => {
-                    const isEligibleForAutoSchedule = !task.parent_id && task.task_type;
+                ) : sortedTasks.length > 0 ? (
+                  sortedTasks.map((task) => {
+                    const isEligibleForAutoSchedule = task.task_type;
                     return (
                     <tr
                       key={task.id}
                       onClick={() => {
-                        if (rescheduleMode && !task.parent_id && task.planned_start_date && !task.is_milestone) {
+                        if (rescheduleMode && task.planned_start_date && !task.is_milestone) {
                           setSelectedTaskForReschedule(task);
                           setRescheduleError(null);
                         }
                       }}
                       className={`
                         hover:bg-gray-50 dark:hover:bg-gray-700
-                        ${rescheduleMode && !task.parent_id && task.planned_start_date && !task.is_milestone ? 'cursor-pointer' : ''}
+                        ${rescheduleMode && task.planned_start_date && !task.is_milestone ? 'cursor-pointer' : ''}
                         ${selectedTaskForReschedule?.id === task.id ? 'bg-orange-100 dark:bg-orange-900/30' : ''}
-                        ${rescheduleMode && (task.parent_id || !task.planned_start_date || task.is_milestone) ? 'opacity-50' : ''}
+                        ${rescheduleMode && (!task.planned_start_date || task.is_milestone) ? 'opacity-50' : ''}
                         ${autoScheduleMode && selectedTasksForAutoSchedule.includes(task.id) ? 'bg-purple-100 dark:bg-purple-900/30' : ''}
                         ${autoScheduleMode && !isEligibleForAutoSchedule ? 'opacity-50' : ''}
                       `}
@@ -1050,15 +1189,12 @@ export function Tasks() {
                       )}
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          {task.isChild && (
-                            <span className="text-gray-400 dark:text-gray-500 ml-2">└</span>
-                          )}
                           {task.is_milestone ? (
                             <Flag className="w-4 h-4 text-orange-500" />
                           ) : (
-                            <ListTodo className={`w-4 h-4 ${task.isChild ? 'text-gray-300 dark:text-gray-600' : 'text-gray-400'}`} />
+                            <ListTodo className="w-4 h-4 text-gray-400" />
                           )}
-                          <span className={`font-medium ${task.is_milestone ? 'text-orange-600 dark:text-orange-400' : task.isChild ? 'text-gray-600 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                          <span className={`font-medium ${task.is_milestone ? 'text-orange-600 dark:text-orange-400' : 'text-gray-900 dark:text-white'}`}>
                             {task.name}
                           </span>
                           {task.is_milestone && (

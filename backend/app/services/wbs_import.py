@@ -55,7 +55,7 @@ class WBSImportTask:
         assigned_member_name: Optional[str] = None,
         description: Optional[str] = None,
         is_milestone: bool = False,
-        parent_wbs: Optional[str] = None,
+        predecessor_wbs: Optional[str] = None,
     ):
         self.row = row
         self.wbs_number = wbs_number
@@ -67,11 +67,11 @@ class WBSImportTask:
         self.assigned_member_name = assigned_member_name
         self.description = description
         self.is_milestone = is_milestone
-        self.parent_wbs = parent_wbs
+        self.predecessor_wbs = predecessor_wbs
 
         # 解決後の値
         self.assigned_member_id: Optional[int] = None
-        self.parent_id: Optional[int] = None
+        self.predecessor_id: Optional[int] = None
 
     def to_dict(self):
         return {
@@ -86,8 +86,7 @@ class WBSImportTask:
             "assigned_member_name": self.assigned_member_name,
             "description": self.description,
             "is_milestone": self.is_milestone,
-            "parent_wbs": self.parent_wbs,
-            "is_child": self.parent_wbs is not None,
+            "predecessor_wbs": self.predecessor_wbs,
         }
 
 
@@ -124,8 +123,9 @@ class WBSImportService:
             ("E", "予定開始日", 15),
             ("F", "予定終了日", 15),
             ("G", "担当者", 15),
-            ("H", "説明", 40),
-            ("I", "固定日付", 10),
+            ("H", "先行タスク", 12),
+            ("I", "説明", 40),
+            ("J", "固定日付", 10),
         ]
 
         for col, header, width in headers:
@@ -137,14 +137,14 @@ class WBSImportService:
             cell.border = thin_border
             ws.column_dimensions[col].width = width
 
-        # サンプルデータ
+        # サンプルデータ（入力例として表示）
+        # WBS番号, タスク名, タスク種別, 予定工数, 予定開始日, 予定終了日, 担当者, 先行タスク, 説明, 固定日付
         sample_data = [
-            ("1", "要件定義フェーズ", "要件定義", 40, "", "", "", "全体の要件定義", ""),
-            ("1.1", "要件ヒアリング", "要件定義", 16, "", "", "", "", ""),
-            ("1.2", "要件定義書作成", "要件定義", 24, "", "", "", "", ""),
-            ("2", "設計フェーズ", "外部設計", 80, "", "", "", "全体の設計", ""),
-            ("2.1", "外部設計", "外部設計", 40, "", "", "", "", ""),
-            ("2.2", "詳細設計", "詳細設計", 40, "", "", "", "", ""),
+            ("1", "【サンプル】要件ヒアリング", "要件定義", 16, "", "", "", "", "※サンプルデータは削除してください", ""),
+            ("2", "【サンプル】要件定義書作成", "要件定義", 24, "", "", "", "1", "先行タスクはWBS番号で指定", ""),
+            ("3", "【サンプル】外部設計", "外部設計", 40, "", "", "", "2", "", ""),
+            ("4", "【サンプル】詳細設計", "詳細設計", 40, "", "", "", "3", "", ""),
+            ("5", "【サンプル】プログラミング", "PG", 80, "", "", "", "4", "", ""),
         ]
 
         for row_idx, data in enumerate(sample_data, start=2):
@@ -184,7 +184,7 @@ class WBSImportService:
             allow_blank=True
         )
         ws.add_data_validation(milestone_validation)
-        milestone_validation.add(f"I2:I1000")
+        milestone_validation.add(f"J2:J1000")
 
         # 使い方シート
         ws_help = wb.create_sheet("使い方")
@@ -192,10 +192,13 @@ class WBSImportService:
             ["ExcelからのWBSインポート 使い方"],
             [""],
             ["■ WBS番号について"],
-            ["  - 階層を表すドット区切りの番号を入力します"],
-            ["  - 例: 1, 1.1, 1.2, 2, 2.1, 2.1.1"],
-            ["  - 「1.1」は「1」の子タスクになります"],
-            ["  - 「2.1.1」は「2.1」の子タスクになります"],
+            ["  - タスクを識別するためのユニークな番号です"],
+            ["  - 例: 1, 2, 3, 10, 20"],
+            ["  - 数字でなくても構いません（例: A, B, C）"],
+            [""],
+            ["■ 先行タスクについて"],
+            ["  - このタスクの前に完了すべきタスクのWBS番号を入力します"],
+            ["  - 例: タスク「3」の先行タスクが「2」なら、H列に「2」と入力"],
             [""],
             ["■ 必須項目"],
             ["  - WBS番号: 必須"],
@@ -316,20 +319,22 @@ class WBSImportService:
             if assigned_member_name:
                 assigned_member_name = str(assigned_member_name).strip()
 
+            # 先行タスク（WBS番号）
+            predecessor_wbs = ws.cell(row=row_idx, column=8).value
+            if predecessor_wbs:
+                predecessor_wbs = str(predecessor_wbs).strip()
+
             # 説明
-            description = ws.cell(row=row_idx, column=8).value
+            description = ws.cell(row=row_idx, column=9).value
             if description:
                 description = str(description).strip()
 
             # 固定日付
-            is_milestone_raw = ws.cell(row=row_idx, column=9).value
+            is_milestone_raw = ws.cell(row=row_idx, column=10).value
             is_milestone = False
             if is_milestone_raw:
                 is_milestone_str = str(is_milestone_raw).strip().upper()
                 is_milestone = is_milestone_str in ("TRUE", "1", "はい", "YES")
-
-            # 親WBS番号を計算
-            parent_wbs = self._get_parent_wbs(wbs_number)
 
             task = WBSImportTask(
                 row=row_idx,
@@ -342,17 +347,17 @@ class WBSImportService:
                 assigned_member_name=assigned_member_name,
                 description=description,
                 is_milestone=is_milestone,
-                parent_wbs=parent_wbs,
+                predecessor_wbs=predecessor_wbs,
             )
             tasks.append(task)
 
-        # 親WBS番号の存在チェック
+        # 先行タスクWBS番号の存在チェック
         wbs_set = set(wbs_numbers_seen.keys())
         for task in tasks:
-            if task.parent_wbs and task.parent_wbs not in wbs_set:
+            if task.predecessor_wbs and task.predecessor_wbs not in wbs_set:
                 errors.append(WBSImportError(
                     task.row,
-                    f"親タスク「{task.parent_wbs}」が見つかりません"
+                    f"先行タスク「{task.predecessor_wbs}」が見つかりません"
                 ))
 
         return tasks, errors
@@ -382,26 +387,16 @@ class WBSImportService:
                 ))
                 return None
 
-    def _get_parent_wbs(self, wbs_number: str) -> Optional[str]:
-        """WBS番号から親のWBS番号を取得"""
-        parts = wbs_number.split(".")
-        if len(parts) <= 1:
-            return None
-        return ".".join(parts[:-1])
-
     def resolve_references(
         self,
         tasks: List[WBSImportTask]
     ) -> Tuple[List[WBSImportTask], List[WBSImportError]]:
-        """担当者名からIDへの解決、親タスク参照の解決"""
+        """担当者名からIDへの解決"""
         errors: List[WBSImportError] = []
 
         # メンバー名→IDマッピングを作成
         members = self.db.query(Member).filter(Member.project_id == self.project_id).all()
         member_map = {m.name: m.id for m in members}
-
-        # WBS番号→タスクマッピングを作成
-        wbs_to_task = {t.wbs_number: t for t in tasks}
 
         for task in tasks:
             # 担当者の解決
@@ -413,12 +408,6 @@ class WBSImportService:
                         task.row,
                         f"担当者「{task.assigned_member_name}」が見つかりません"
                     ))
-
-            # 親タスクの解決（インポート時に実際のIDで解決）
-            # ここでは参照チェックのみ
-            if task.parent_wbs and task.parent_wbs not in wbs_to_task:
-                # 既にパース時にチェック済みなので、ここでは追加しない
-                pass
 
         return tasks, errors
 
@@ -470,21 +459,15 @@ class WBSImportService:
         # 既存タスクを全削除
         self.db.query(Task).filter(Task.project_id == self.project_id).delete()
 
-        # WBS番号順にソート（親が先に来るように）
-        tasks.sort(key=lambda t: [int(x) if x.isdigit() else x for x in t.wbs_number.split(".")])
-
-        # 新規タスクを作成
+        # 新規タスクを作成（まず先行タスクなしで作成）
         wbs_to_db_id: Dict[str, int] = {}
+        created_tasks: List[Task] = []
 
         for task in tasks:
-            # 親タスクIDを解決
-            parent_id = None
-            if task.parent_wbs and task.parent_wbs in wbs_to_db_id:
-                parent_id = wbs_to_db_id[task.parent_wbs]
-
             db_task = Task(
                 project_id=self.project_id,
-                parent_id=parent_id,
+                parent_id=None,  # 親子関係は使用しない
+                predecessor_id=None,  # 後で設定
                 name=task.name,
                 description=task.description,
                 task_type=task.task_type,
@@ -501,6 +484,12 @@ class WBSImportService:
             self.db.flush()  # IDを取得するためにflush
 
             wbs_to_db_id[task.wbs_number] = db_task.id
+            created_tasks.append(db_task)
+
+        # 先行タスクIDを設定
+        for i, task in enumerate(tasks):
+            if task.predecessor_wbs and task.predecessor_wbs in wbs_to_db_id:
+                created_tasks[i].predecessor_id = wbs_to_db_id[task.predecessor_wbs]
 
         self.db.commit()
 

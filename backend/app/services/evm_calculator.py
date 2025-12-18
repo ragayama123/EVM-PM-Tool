@@ -62,7 +62,7 @@ class EVMCalculator:
 
         as_of_date_only = as_of_date.date()
 
-        # 予定開始日が設定されているタスクを取得
+        # 全タスクを取得
         tasks = self.db.query(Task).filter(
             Task.project_id == self.project_id
         ).all()
