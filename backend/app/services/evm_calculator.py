@@ -25,24 +25,32 @@ class EVMCalculator:
             self._holiday_dates = {h[0] for h in holidays}
         return self._holiday_dates
 
+    def _is_non_working_day(self, target_date: date) -> bool:
+        """指定日が非稼働日（土日または休日）かどうかを判定"""
+        # 土曜日(5)または日曜日(6)
+        if target_date.weekday() >= 5:
+            return True
+        # 休日カレンダーに登録されている日
+        if target_date in self._get_holiday_dates():
+            return True
+        return False
+
     def _count_working_days(self, start_date: date, end_date: date) -> int:
-        """期間内の稼働日数を計算（休日を除外）"""
-        holiday_dates = self._get_holiday_dates()
+        """期間内の稼働日数を計算（土日祝日を除外）"""
         working_days = 0
         current = start_date
         while current <= end_date:
-            if current not in holiday_dates:
+            if not self._is_non_working_day(current):
                 working_days += 1
             current += timedelta(days=1)
         return working_days
 
     def _count_elapsed_working_days(self, start_date: date, as_of_date: date) -> int:
-        """開始日から基準日までの経過稼働日数を計算（休日を除外）"""
-        holiday_dates = self._get_holiday_dates()
+        """開始日から基準日までの経過稼働日数を計算（土日祝日を除外）"""
         working_days = 0
         current = start_date
         while current <= as_of_date:
-            if current not in holiday_dates:
+            if not self._is_non_working_day(current):
                 working_days += 1
             current += timedelta(days=1)
         return working_days

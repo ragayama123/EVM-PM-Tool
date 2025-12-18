@@ -23,6 +23,16 @@ class RescheduleService:
             self._holiday_dates = {h[0] for h in holidays}
         return self._holiday_dates
 
+    def _is_non_working_day(self, target_date: date) -> bool:
+        """指定日が非稼働日（土日または休日）かどうかを判定"""
+        # 土曜日(5)または日曜日(6)
+        if target_date.weekday() >= 5:
+            return True
+        # 休日カレンダーに登録されている日
+        if target_date in self._get_holiday_dates():
+            return True
+        return False
+
     def _to_date(self, dt: Any) -> Optional[date]:
         """datetimeまたはdateをdateに変換"""
         if dt is None:
@@ -35,7 +45,7 @@ class RescheduleService:
 
     def add_working_days(self, start_date: date, days: int) -> date:
         """
-        稼働日を加算/減算した日付を計算
+        稼働日を加算/減算した日付を計算（土日祝日を除外）
 
         Args:
             start_date: 基準日
@@ -47,14 +57,13 @@ class RescheduleService:
         if days == 0:
             return start_date
 
-        holidays = self._get_holiday_dates()
         current = start_date
         remaining = abs(days)
         direction = 1 if days > 0 else -1
 
         while remaining > 0:
             current += timedelta(days=direction)
-            if current not in holidays:
+            if not self._is_non_working_day(current):
                 remaining -= 1
 
         return current

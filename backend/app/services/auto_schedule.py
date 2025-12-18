@@ -26,6 +26,16 @@ class AutoScheduleService:
             self._holiday_dates = {h[0] for h in holidays}
         return self._holiday_dates
 
+    def _is_non_working_day(self, target_date: date) -> bool:
+        """指定日が非稼働日（土日または休日）かどうかを判定"""
+        # 土曜日(5)または日曜日(6)
+        if target_date.weekday() >= 5:
+            return True
+        # 休日カレンダーに登録されている日
+        if target_date in self._get_holiday_dates():
+            return True
+        return False
+
     def _to_date(self, dt: Any) -> Optional[date]:
         """datetimeまたはdateをdateに変換"""
         if dt is None:
@@ -50,31 +60,30 @@ class AutoScheduleService:
         """
         稼働日を加算した日付を計算（終了日）
         days=1の場合は同日、days=2の場合は翌稼働日
+        土日祝日を除外した稼働日で計算
         """
         if days <= 0:
             return start_date
 
-        holidays = self._get_holiday_dates()
         current = start_date
         remaining = days - 1  # 開始日を含むので-1
 
-        # 開始日が休日の場合は次の稼働日を探す
-        while current in holidays:
+        # 開始日が非稼働日（土日または休日）の場合は次の稼働日を探す
+        while self._is_non_working_day(current):
             current += timedelta(days=1)
 
         # 残りの稼働日を加算
         while remaining > 0:
             current += timedelta(days=1)
-            if current not in holidays:
+            if not self._is_non_working_day(current):
                 remaining -= 1
 
         return current
 
     def get_next_working_day(self, current_date: date) -> date:
-        """次の稼働日を取得"""
-        holidays = self._get_holiday_dates()
+        """次の稼働日を取得（土日祝日を除外）"""
         next_day = current_date + timedelta(days=1)
-        while next_day in holidays:
+        while self._is_non_working_day(next_day):
             next_day += timedelta(days=1)
         return next_day
 
@@ -223,9 +232,8 @@ class AutoScheduleService:
                 if predecessor_next > task_start:
                     task_start = predecessor_next
 
-            # 休日を考慮して開始日を調整
-            holidays = self._get_holiday_dates()
-            while task_start in holidays:
+            # 土日祝日を考慮して開始日を調整
+            while self._is_non_working_day(task_start):
                 task_start += timedelta(days=1)
 
             # 所要日数を計算
