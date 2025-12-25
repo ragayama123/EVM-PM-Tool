@@ -6,11 +6,13 @@ from sqlalchemy import func as sql_func
 from collections import defaultdict
 
 from app.core.database import get_db
+from app.core.auth import get_current_user
 from app.models.member import Member
 from app.models.member_skill import MemberSkill
 from app.models.task import Task
 from app.models.holiday import Holiday
 from app.models.project import Project
+from app.models.user import User
 from app.schemas.member import (
     MemberCreate, MemberUpdate, MemberResponse, MemberWithUtilization, MemberEVM,
     MemberSkillUpdate, MemberWithSkills, TASK_TYPES,
@@ -21,7 +23,11 @@ router = APIRouter(prefix="/members", tags=["members"])
 
 
 @router.get("/project/{project_id}", response_model=List[MemberWithUtilization])
-def get_members_by_project(project_id: int, db: Session = Depends(get_db)):
+def get_members_by_project(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """プロジェクトのメンバー一覧を取得（稼働率付き）"""
     # プロジェクト情報を取得
     project = db.query(Project).filter(Project.id == project_id).first()
@@ -80,7 +86,11 @@ def get_members_by_project(project_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{member_id}", response_model=MemberResponse)
-def get_member(member_id: int, db: Session = Depends(get_db)):
+def get_member(
+    member_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """メンバー詳細を取得"""
     member = db.query(Member).filter(Member.id == member_id).first()
     if not member:
@@ -89,7 +99,11 @@ def get_member(member_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=MemberResponse)
-def create_member(member: MemberCreate, db: Session = Depends(get_db)):
+def create_member(
+    member: MemberCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """メンバーを作成"""
     db_member = Member(**member.model_dump())
     db.add(db_member)
@@ -99,7 +113,12 @@ def create_member(member: MemberCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{member_id}", response_model=MemberResponse)
-def update_member(member_id: int, member: MemberUpdate, db: Session = Depends(get_db)):
+def update_member(
+    member_id: int,
+    member: MemberUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """メンバーを更新"""
     db_member = db.query(Member).filter(Member.id == member_id).first()
     if not db_member:
@@ -115,7 +134,11 @@ def update_member(member_id: int, member: MemberUpdate, db: Session = Depends(ge
 
 
 @router.delete("/{member_id}")
-def delete_member(member_id: int, db: Session = Depends(get_db)):
+def delete_member(
+    member_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """メンバーを削除"""
     db_member = db.query(Member).filter(Member.id == member_id).first()
     if not db_member:
@@ -132,7 +155,11 @@ def delete_member(member_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{member_id}/skills", response_model=List[str])
-def get_member_skills(member_id: int, db: Session = Depends(get_db)):
+def get_member_skills(
+    member_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """メンバーのスキル（担当可能タスク種別）を取得"""
     member = db.query(Member).filter(Member.id == member_id).first()
     if not member:
@@ -149,7 +176,8 @@ def get_member_skills(member_id: int, db: Session = Depends(get_db)):
 def update_member_skills(
     member_id: int,
     request: MemberSkillUpdate,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """メンバーのスキル（担当可能タスク種別）を更新"""
     member = db.query(Member).filter(Member.id == member_id).first()
@@ -178,7 +206,11 @@ def update_member_skills(
 
 
 @router.get("/project/{project_id}/with-skills", response_model=List[MemberWithSkills])
-def get_members_with_skills(project_id: int, db: Session = Depends(get_db)):
+def get_members_with_skills(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """プロジェクトのメンバー一覧を取得（スキル付き）"""
     members = db.query(Member).filter(Member.project_id == project_id).all()
 
@@ -206,7 +238,8 @@ def get_members_utilization(
     project_id: int,
     start_date: str = Query(..., description="開始日 (YYYY-MM-DD)"),
     end_date: str = Query(..., description="終了日 (YYYY-MM-DD)"),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """プロジェクトのメンバー稼働率詳細を取得（日毎・週毎）"""
     # 日付をパース
@@ -334,7 +367,11 @@ def get_members_utilization(
 
 
 @router.get("/project/{project_id}/evm", response_model=List[MemberEVM])
-def get_members_evm(project_id: int, db: Session = Depends(get_db)):
+def get_members_evm(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """プロジェクトのメンバー別EVM指標を取得（工数ベース）"""
     members = db.query(Member).filter(Member.project_id == project_id).all()
     as_of_date = datetime.now(timezone.utc).replace(tzinfo=None)

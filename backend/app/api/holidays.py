@@ -7,8 +7,10 @@ import csv
 import io
 
 from app.core.database import get_db
+from app.core.auth import get_current_user
 from app.models.holiday import Holiday, HolidayType
 from app.models.project import Project
+from app.models.user import User
 from app.schemas.holiday import (
     HolidayCreate, HolidayUpdate, HolidayResponse,
     HolidayImportRequest, HolidayGenerateRequest
@@ -88,7 +90,8 @@ def get_holidays_by_project(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     holiday_type: Optional[HolidayType] = None,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """プロジェクトの休日一覧を取得"""
     query = db.query(Holiday).filter(Holiday.project_id == project_id)
@@ -105,7 +108,11 @@ def get_holidays_by_project(
 
 
 @router.get("/{holiday_id}", response_model=HolidayResponse)
-def get_holiday(holiday_id: int, db: Session = Depends(get_db)):
+def get_holiday(
+    holiday_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """休日詳細を取得"""
     holiday = db.query(Holiday).filter(Holiday.id == holiday_id).first()
     if not holiday:
@@ -114,7 +121,11 @@ def get_holiday(holiday_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=HolidayResponse)
-def create_holiday(holiday: HolidayCreate, db: Session = Depends(get_db)):
+def create_holiday(
+    holiday: HolidayCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """休日を作成"""
     # プロジェクトの存在確認
     project = db.query(Project).filter(Project.id == holiday.project_id).first()
@@ -133,7 +144,12 @@ def create_holiday(holiday: HolidayCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{holiday_id}", response_model=HolidayResponse)
-def update_holiday(holiday_id: int, holiday: HolidayUpdate, db: Session = Depends(get_db)):
+def update_holiday(
+    holiday_id: int,
+    holiday: HolidayUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """休日を更新"""
     db_holiday = db.query(Holiday).filter(Holiday.id == holiday_id).first()
     if not db_holiday:
@@ -149,7 +165,11 @@ def update_holiday(holiday_id: int, holiday: HolidayUpdate, db: Session = Depend
 
 
 @router.delete("/{holiday_id}")
-def delete_holiday(holiday_id: int, db: Session = Depends(get_db)):
+def delete_holiday(
+    holiday_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """休日を削除"""
     db_holiday = db.query(Holiday).filter(Holiday.id == holiday_id).first()
     if not db_holiday:
@@ -164,7 +184,8 @@ def delete_holiday(holiday_id: int, db: Session = Depends(get_db)):
 def delete_all_holidays(
     project_id: int,
     holiday_type: Optional[HolidayType] = None,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """プロジェクトの休日を一括削除"""
     query = db.query(Holiday).filter(Holiday.project_id == project_id)
@@ -181,7 +202,8 @@ def delete_all_holidays(
 def import_holidays(
     project_id: int,
     request: HolidayImportRequest,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """休日を一括インポート"""
     # プロジェクトの存在確認
@@ -228,7 +250,8 @@ async def import_holidays_csv(
     project_id: int,
     file: UploadFile = File(...),
     overwrite: bool = False,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """CSVファイルから休日をインポート
 
@@ -313,7 +336,8 @@ async def import_holidays_csv(
 def generate_holidays(
     project_id: int,
     request: HolidayGenerateRequest,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """期間内の週末・祝日を自動生成"""
     # プロジェクトの存在確認
@@ -376,7 +400,8 @@ def get_working_days_count(
     project_id: int,
     start_date: date,
     end_date: date,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """期間内の稼働日数を計算"""
     # 全日数
@@ -405,7 +430,8 @@ def get_holiday_dates(
     project_id: int,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """休日の日付リストを取得（EVM計算用）"""
     query = db.query(Holiday.date).filter(Holiday.project_id == project_id)

@@ -5,8 +5,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.core.database import get_db
+from app.core.auth import get_current_user
 from app.models.project import Project, ProjectStatus
 from app.models.task import Task
+from app.models.user import User
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -55,14 +57,23 @@ def project_to_response(db: Session, project: Project) -> ProjectResponse:
 
 
 @router.get("/", response_model=List[ProjectResponse])
-def get_projects(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_projects(
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """プロジェクト一覧を取得"""
     projects = db.query(Project).offset(skip).limit(limit).all()
     return [project_to_response(db, p) for p in projects]
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
-def get_project(project_id: int, db: Session = Depends(get_db)):
+def get_project(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """プロジェクト詳細を取得"""
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -71,7 +82,11 @@ def get_project(project_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=ProjectResponse)
-def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
+def create_project(
+    project: ProjectCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """プロジェクトを作成"""
     db_project = Project(
         name=project.name,
@@ -91,7 +106,12 @@ def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
-def update_project(project_id: int, project: ProjectUpdate, db: Session = Depends(get_db)):
+def update_project(
+    project_id: int,
+    project: ProjectUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """プロジェクトを更新"""
     db_project = db.query(Project).filter(Project.id == project_id).first()
     if not db_project:
@@ -107,7 +127,11 @@ def update_project(project_id: int, project: ProjectUpdate, db: Session = Depend
 
 
 @router.delete("/{project_id}")
-def delete_project(project_id: int, db: Session = Depends(get_db)):
+def delete_project(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """プロジェクトを削除"""
     db_project = db.query(Project).filter(Project.id == project_id).first()
     if not db_project:
@@ -119,7 +143,11 @@ def delete_project(project_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{project_id}/refresh-status", response_model=ProjectResponse)
-def refresh_project_status(project_id: int, db: Session = Depends(get_db)):
+def refresh_project_status(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """タスクの状態に基づいてプロジェクトステータスを再計算"""
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -148,7 +176,10 @@ def refresh_project_status(project_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/refresh-all-status")
-def refresh_all_project_status(db: Session = Depends(get_db)):
+def refresh_all_project_status(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """全プロジェクトのステータスを再計算"""
     projects = db.query(Project).all()
     updated = []

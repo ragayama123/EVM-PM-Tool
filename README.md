@@ -71,7 +71,60 @@ npm install
 npm run dev
 ```
 
-開発サーバー: http://localhost:5173
+開発サーバー: http://localhost:3000
+
+## 認証（Supabase Auth）
+
+このツールはSupabase AuthのMagic Link認証を使用しています。
+
+### Supabase設定
+
+1. [Supabase](https://supabase.com/)でプロジェクトを作成
+
+2. **Redirect URLs設定**（Authentication > URL Configuration）:
+   - `https://wbs-evm-frontend.fly.dev/auth/callback`
+   - `http://localhost:3000/auth/callback`
+
+3. **JWT Secret取得**（Settings > API > JWT Settings）
+
+### 環境変数設定
+
+**バックエンド** (`backend/.env`):
+```
+SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_JWT_SECRET=your-jwt-secret
+```
+
+**フロントエンド** (`frontend/.env.local`):
+```
+VITE_SUPABASE_URL=https://xxxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_APP_BASE_URL=http://localhost:3000
+```
+
+### 許可リスト（Allowlist）
+
+ログインできるユーザーは許可リストで管理されます。初期ユーザーの登録:
+
+```bash
+cd backend
+source .venv/bin/activate
+python -c "
+from app.core.database import SessionLocal
+from app.models.allowlist import AllowedEmail
+
+db = SessionLocal()
+allowed = AllowedEmail(email='your-email@example.com')
+db.add(allowed)
+db.commit()
+print('Added to allowlist')
+db.close()
+"
+```
+
+### 本番URL変更時の注意
+
+Flyアプリ名変更などでURLが変わる場合は、必ずSupabaseのRedirect URLsも更新してください。
 
 ## 技術スタック
 

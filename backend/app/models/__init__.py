@@ -6,5 +6,6 @@ from app.models.cost import Cost
 from app.models.evm_snapshot import EVMSnapshot
 from app.models.user import User
 from app.models.holiday import Holiday
+from app.models.allowlist import AllowedEmail
 
-__all__ = ["Project", "Member", "MemberSkill", "Task", "Cost", "EVMSnapshot", "User", "Holiday"]
+__all__ = ["Project", "Member", "MemberSkill", "Task", "Cost", "EVMSnapshot", "User", "Holiday", "AllowedEmail"]

@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FolderKanban, ListTodo, Users, BarChart3, Moon, Sun } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ListTodo, Users, BarChart3, Moon, Sun, LogOut } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const navItems = [
   { path: '/', label: 'ダッシュボード', icon: LayoutDashboard },
@@ -13,6 +14,7 @@ const navItems = [
 export function Layout() {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
+  const { user, signOut } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
@@ -22,17 +24,31 @@ export function Layout() {
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">
             WBS・EVM管理ツール
           </h1>
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            title={theme === 'light' ? 'ダークモードに切り替え' : 'ライトモードに切り替え'}
-          >
-            {theme === 'light' ? (
-              <Moon className="w-5 h-5 text-gray-600" />
-            ) : (
-              <Sun className="w-5 h-5 text-yellow-400" />
+          <div className="flex items-center gap-4">
+            {user && (
+              <span className="text-sm text-gray-600 dark:text-gray-300">
+                {user.email}
+              </span>
             )}
-          </button>
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              title={theme === 'light' ? 'ダークモードに切り替え' : 'ライトモードに切り替え'}
+            >
+              {theme === 'light' ? (
+                <Moon className="w-5 h-5 text-gray-600" />
+              ) : (
+                <Sun className="w-5 h-5 text-yellow-400" />
+              )}
+            </button>
+            <button
+              onClick={signOut}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              title="ログアウト"
+            >
+              <LogOut className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+            </button>
+          </div>
         </div>
       </header>
 

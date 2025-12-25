@@ -4,8 +4,10 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.auth import get_current_user
 from app.models.task import Task
 from app.models.project import Project, ProjectStatus
+from app.models.user import User
 from app.schemas.task import (
     TaskCreate,
     TaskUpdate,
@@ -96,14 +98,22 @@ def update_project_dates(db: Session, project_id: int):
 
 
 @router.get("/project/{project_id}", response_model=List[TaskResponse])
-def get_tasks_by_project(project_id: int, db: Session = Depends(get_db)):
+def get_tasks_by_project(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """プロジェクトのタスク一覧を取得"""
     tasks = db.query(Task).filter(Task.project_id == project_id).all()
     return tasks
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
-def get_task(task_id: int, db: Session = Depends(get_db)):
+def get_task(
+    task_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """タスク詳細を取得"""
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
@@ -112,7 +122,11 @@ def get_task(task_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=TaskResponse)
-def create_task(task: TaskCreate, db: Session = Depends(get_db)):
+def create_task(
+    task: TaskCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """タスクを作成"""
     db_task = Task(**task.model_dump())
     db.add(db_task)
@@ -127,7 +141,12 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{task_id}", response_model=TaskResponse)
-def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_db)):
+def update_task(
+    task_id: int,
+    task: TaskUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """タスクを更新"""
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
@@ -148,7 +167,12 @@ def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{task_id}/progress")
-def update_task_progress(task_id: int, progress: float, db: Session = Depends(get_db)):
+def update_task_progress(
+    task_id: int,
+    progress: float,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """タスクの進捗率を更新"""
     if not 0 <= progress <= 100:
         raise HTTPException(status_code=400, detail="進捗率は0〜100の範囲で指定してください")
@@ -168,7 +192,11 @@ def update_task_progress(task_id: int, progress: float, db: Session = Depends(ge
 
 
 @router.delete("/{task_id}")
-def delete_task(task_id: int, db: Session = Depends(get_db)):
+def delete_task(
+    task_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """タスクを削除"""
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
@@ -189,7 +217,8 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
 def preview_reschedule(
     project_id: int,
     request: RescheduleRequest,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     リスケジュールのプレビュー
@@ -221,7 +250,8 @@ def preview_reschedule(
 def execute_reschedule(
     project_id: int,
     request: RescheduleRequest,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     リスケジュール実行
@@ -260,7 +290,8 @@ def execute_reschedule(
 def preview_auto_schedule(
     project_id: int,
     request: AutoScheduleRequest,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     自動スケジュールのプレビュー
@@ -280,7 +311,8 @@ def preview_auto_schedule(
 def execute_auto_schedule(
     project_id: int,
     request: AutoScheduleRequest,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     自動スケジュール実行
@@ -303,7 +335,8 @@ def execute_auto_schedule(
 @router.get("/project/{project_id}/template")
 def download_wbs_template(
     project_id: int,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     WBSインポート用Excelテンプレートをダウンロード
@@ -330,7 +363,8 @@ def download_wbs_template(
 async def preview_wbs_import(
     project_id: int,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     WBSインポートのプレビュー
@@ -361,7 +395,8 @@ async def preview_wbs_import(
 async def execute_wbs_import(
     project_id: int,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     WBSインポート実行
