@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { supabase } from '../lib/supabase';
 import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM, MemberWithSkills, MemberUtilizationDetail, Holiday, HolidayCreate, HolidayImportItem, HolidayGenerateRequest, WorkingDaysInfo, HolidayType, ReschedulePreviewResponse, RescheduleResponse, AutoSchedulePreviewResponse, AutoScheduleResponse, WBSImportPreviewResponse, WBSImportResponse } from '../types';
 
 const api = axios.create({
@@ -7,6 +8,27 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// リクエストインターセプター: Authorizationヘッダーを追加
+api.interceptors.request.use(async (config) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
+  }
+  return config;
+});
+
+// レスポンスインターセプター: 401エラー時にログアウト
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      await supabase.auth.signOut();
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 // プロジェクトAPI
 export const projectsApi = {

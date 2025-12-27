@@ -6,9 +6,11 @@ from sqlalchemy.orm import Session
 import json
 
 from app.core.database import get_db
+from app.core.auth import get_current_user
 from app.models.project import Project
 from app.models.task import Task
 from app.models.member import Member
+from app.models.user import User
 from app.models.evm_snapshot import EVMSnapshot
 from app.schemas.evm import EVMMetrics, EVMSnapshotResponse
 from app.services.evm_calculator import EVMCalculator
@@ -20,7 +22,8 @@ router = APIRouter(prefix="/evm", tags=["evm"])
 def get_evm_metrics(
     project_id: int,
     as_of_date: Optional[datetime] = Query(None, description="計算基準日"),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """プロジェクトのEVM指標を計算して取得"""
     project = db.query(Project).filter(Project.id == project_id).first()
@@ -36,7 +39,8 @@ def get_evm_metrics(
 def create_evm_snapshot(
     project_id: int,
     as_of_date: Optional[datetime] = Query(None, description="スナップショット日"),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """EVM指標のスナップショットを作成"""
     project = db.query(Project).filter(Project.id == project_id).first()
@@ -53,7 +57,8 @@ def get_evm_snapshots(
     project_id: int,
     start_date: Optional[datetime] = Query(None, description="開始日"),
     end_date: Optional[datetime] = Query(None, description="終了日"),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """プロジェクトのEVMスナップショット履歴を取得"""
     query = db.query(EVMSnapshot).filter(EVMSnapshot.project_id == project_id)
@@ -68,7 +73,11 @@ def get_evm_snapshots(
 
 
 @router.get("/projects/{project_id}/analysis")
-def get_evm_analysis(project_id: int, db: Session = Depends(get_db)):
+def get_evm_analysis(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """プロジェクトのEVM分析結果を取得"""
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -128,7 +137,8 @@ def _generate_recommendations(metrics: dict) -> List[str]:
 def export_evm_for_llm(
     project_id: int,
     format: str = Query("markdown", description="出力形式: markdown, json, yaml"),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     LLM分析用にEVMデータをエクスポート

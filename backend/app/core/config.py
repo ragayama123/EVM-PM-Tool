@@ -10,13 +10,17 @@ class Settings(BaseSettings):
     # データベース
     DATABASE_URL: str = "sqlite:///./evm.db"
 
-    # JWT認証
+    # JWT認証（レガシー、Supabase移行後は不要）
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    # Supabase設定
+    SUPABASE_URL: str = ""
+    SUPABASE_JWT_SECRET: str = ""
+
     # CORS設定（カンマ区切りで複数指定可能）
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,https://wbs-evm-frontend.fly.dev"
 
     class Config:
         env_file = ".env"
