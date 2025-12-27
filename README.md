@@ -241,10 +241,7 @@ Fly.ioにデプロイ後、SSHで接続してユーザーを追加:
 
 ```bash
 cd backend
-fly ssh console
-
-# コンテナ内で実行
-python -c "
+fly ssh console --command "python -c \"
 from app.core.database import SessionLocal
 from app.models.allowlist import AllowedEmail
 
@@ -254,8 +251,38 @@ db.add(allowed)
 db.commit()
 print('Added to allowlist')
 db.close()
-"
+\""
 ```
+
+### トラブルシューティング
+
+#### データベースマイグレーションエラー
+
+既存のデータベースでSupabase認証関連のエラーが発生した場合、以下のマイグレーションを実行:
+
+```bash
+cd backend
+fly ssh console --command "python -c \"
+import sqlite3
+conn = sqlite3.connect('/data/evm.db')
+cursor = conn.cursor()
+
+# supabase_uidカラムを追加（存在しない場合）
+cursor.execute('PRAGMA table_info(users)')
+columns = [col[1] for col in cursor.fetchall()]
+if 'supabase_uid' not in columns:
+    cursor.execute('ALTER TABLE users ADD COLUMN supabase_uid VARCHAR')
+    print('Added supabase_uid column')
+
+conn.commit()
+conn.close()
+\""
+```
+
+**hashed_passwordのNOT NULL制約エラーが発生する場合:**
+
+Supabase認証ではパスワードを使用しないため、テーブルの再作成が必要です。
+詳細は [docs/supabase-auth-implementation.md](docs/supabase-auth-implementation.md) を参照してください。
 
 ### 再デプロイ
 
