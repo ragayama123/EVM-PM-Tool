@@ -12,7 +12,101 @@ WBS（作業分解構成図）とEVM（アーンドバリューマネジメン�
 - ガントチャート表示
 - ダッシュボードによる可視化
 
-## クイックスタート（Docker）
+## セットアップ
+
+### 1. Supabaseプロジェクトの作成（必須）
+
+このツールはSupabase AuthのMagic Link認証を使用しています。
+
+1. [Supabase](https://supabase.com/)でアカウント作成・ログイン
+2. 「New Project」でプロジェクトを作成
+3. プロジェクト作成後、以下の情報を控えておく:
+   - **Project URL**: `https://xxxxx.supabase.co`（Settings > API）
+   - **Publishable key (anon key)**: `sb_publishable_xxx...`（Settings > API > API Keys）
+   - **JWT Secret**: （Settings > API > JWT Settings）
+
+4. **Redirect URLs設定**（Authentication > URL Configuration）:
+   - Site URL: `http://localhost:5173`（ローカル開発用）
+   - Redirect URLs に追加:
+     - `http://localhost:5173/auth/callback`
+
+### 2. リポジトリのクローン
+
+```bash
+git clone https://github.com/ragayama123/EVM-PM-Tool.git
+cd EVM-PM-Tool
+```
+
+### 3. 環境変数の設定
+
+**バックエンド** (`backend/.env`を作成):
+```bash
+cp backend/.env.example backend/.env
+```
+
+`backend/.env` を編集:
+```
+SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_JWT_SECRET=your-jwt-secret
+```
+
+**フロントエンド** (`frontend/.env`を作成):
+```bash
+cp frontend/.env.example frontend/.env
+```
+
+`frontend/.env` を編集:
+```
+VITE_SUPABASE_URL=https://xxxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_xxx...
+```
+
+## ローカル開発
+
+### バックエンド
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+- API: http://localhost:8000
+- Swagger UI: http://localhost:8000/docs
+
+### フロントエンド
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+- 開発サーバー: http://localhost:5173
+
+### 許可リスト（Allowlist）へのユーザー登録
+
+ログインできるユーザーは許可リストで管理されます。初期ユーザーの登録:
+
+```bash
+cd backend
+source .venv/bin/activate
+python -c "
+from app.core.database import SessionLocal
+from app.models.allowlist import AllowedEmail
+
+db = SessionLocal()
+allowed = AllowedEmail(email='your-email@example.com')
+db.add(allowed)
+db.commit()
+print('Added to allowlist')
+db.close()
+"
+```
+
+## Docker（ローカル環境）
 
 ### 必要要件
 
@@ -22,10 +116,6 @@ WBS（作業分解構成図）とEVM（アーンドバリューマネジメン�
 ### 起動方法
 
 ```bash
-# リポジトリをクローン
-git clone https://github.com/ragayama123/EVM-PM-Tool.git
-cd EVM-PM-Tool
-
 # 起動
 docker compose up -d
 
@@ -47,84 +137,6 @@ docker compose down
 ```bash
 docker compose down -v
 ```
-
-## ローカル開発
-
-### バックエンド
-
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-API: http://localhost:8000
-Swagger UI: http://localhost:8000/docs
-
-### フロントエンド
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-開発サーバー: http://localhost:3000
-
-## 認証（Supabase Auth）
-
-このツールはSupabase AuthのMagic Link認証を使用しています。
-
-### Supabase設定
-
-1. [Supabase](https://supabase.com/)でプロジェクトを作成
-
-2. **Redirect URLs設定**（Authentication > URL Configuration）:
-   - `https://wbs-evm-frontend.fly.dev/auth/callback`
-   - `http://localhost:3000/auth/callback`
-
-3. **JWT Secret取得**（Settings > API > JWT Settings）
-
-### 環境変数設定
-
-**バックエンド** (`backend/.env`):
-```
-SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_JWT_SECRET=your-jwt-secret
-```
-
-**フロントエンド** (`frontend/.env.local`):
-```
-VITE_SUPABASE_URL=https://xxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-VITE_APP_BASE_URL=http://localhost:3000
-```
-
-### 許可リスト（Allowlist）
-
-ログインできるユーザーは許可リストで管理されます。初期ユーザーの登録:
-
-```bash
-cd backend
-source .venv/bin/activate
-python -c "
-from app.core.database import SessionLocal
-from app.models.allowlist import AllowedEmail
-
-db = SessionLocal()
-allowed = AllowedEmail(email='your-email@example.com')
-db.add(allowed)
-db.commit()
-print('Added to allowlist')
-db.close()
-"
-```
-
-### 本番URL変更時の注意
-
-Flyアプリ名変更などでURLが変わる場合は、必ずSupabaseのRedirect URLsも更新してください。
 
 ## 技術スタック
 
@@ -182,17 +194,15 @@ fly auth login
 ```bash
 cd backend
 
-# アプリ作成（名前を聞かれたらユニークな名前を入力）
+# アプリ作成（名前を聞かれたらユニークな名前を入力、例: my-evm-backend）
 fly launch --no-deploy
 
 # データ永続化用ボリューム作成
 fly volumes create evm_data --region nrt --size 1
 
-# シークレット設定
-fly secrets set SECRET_KEY="$(openssl rand -hex 32)"
-
-# CORS設定（フロントエンドのURLを設定）
-fly secrets set CORS_ORIGINS="https://your-frontend-app.fly.dev"
+# Supabase認証用シークレット設定
+fly secrets set SUPABASE_URL="https://xxxxx.supabase.co"
+fly secrets set SUPABASE_JWT_SECRET="your-jwt-secret"
 
 # デプロイ
 fly deploy
@@ -203,14 +213,64 @@ fly deploy
 ```bash
 cd frontend
 
-# nginx.fly.conf のバックエンドURLを編集
+# fly.toml を編集してバックエンドのURLを設定
+# [env] セクションの API_URL を実際のバックエンドアプリ名に変更
+
+# nginx.fly.conf のバックエンドURLも編集
 # wbs-evm-backend.fly.dev → 実際のバックエンドアプリ名に変更
 
 # アプリ作成
 fly launch --no-deploy
 
-# デプロイ
+# Supabase環境変数をビルド引数として渡してデプロイ
+fly deploy \
+  --build-arg VITE_SUPABASE_URL="https://xxxxx.supabase.co" \
+  --build-arg VITE_SUPABASE_ANON_KEY="sb_publishable_xxx..."
+```
+
+#### 4. SupabaseのRedirect URLs更新
+
+Supabaseダッシュボード > Authentication > URL Configuration で以下を設定:
+
+- **Site URL**: `https://your-frontend-app.fly.dev`
+- **Redirect URLs** に追加: `https://your-frontend-app.fly.dev/auth/callback`
+
+#### 5. 許可リストへのユーザー追加（本番環境）
+
+Fly.ioにデプロイ後、SSHで接続してユーザーを追加:
+
+```bash
+cd backend
+fly ssh console
+
+# コンテナ内で実行
+python -c "
+from app.core.database import SessionLocal
+from app.models.allowlist import AllowedEmail
+
+db = SessionLocal()
+allowed = AllowedEmail(email='your-email@example.com')
+db.add(allowed)
+db.commit()
+print('Added to allowlist')
+db.close()
+"
+```
+
+### 再デプロイ
+
+コード変更後の再デプロイ:
+
+```bash
+# バックエンド
+cd backend
 fly deploy
+
+# フロントエンド（Supabase環境変数が必要）
+cd frontend
+fly deploy \
+  --build-arg VITE_SUPABASE_URL="https://xxxxx.supabase.co" \
+  --build-arg VITE_SUPABASE_ANON_KEY="sb_publishable_xxx..."
 ```
 
 ### 注意事項
@@ -218,6 +278,7 @@ fly deploy
 - 無料枠: 3つの共有CPU VM + 3GBボリューム
 - 非アクティブ時は自動停止（初回アクセス時に数秒かかる）
 - データはボリュームに永続化されるため、再デプロイしても消えない
+- フロントエンドのSupabase環境変数はビルド時に埋め込まれるため、`fly secrets`ではなく`--build-arg`で渡す必要がある
 
 ## ライセンス
 
