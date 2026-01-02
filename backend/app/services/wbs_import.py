@@ -16,6 +16,7 @@ from app.models.member import Member
 TASK_TYPES = {
     '要件定義': 'requirements',
     '外部設計': 'external_design',
+    '基本設計': 'basic_design',
     '詳細設計': 'detailed_design',
     'PG': 'pg',
     'UT': 'ut',

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 TASK_TYPES = [
     "requirements",      # 要件定義
     "external_design",   # 外部設計
+    "basic_design",      # 基本設計
     "detailed_design",   # 詳細設計
     "pg",                # PG（プログラミング）
     "ut",                # UT（単体テスト）
@@ -19,6 +20,7 @@ TASK_TYPES = [
 TASK_TYPE_LABELS = {
     "requirements": "要件定義",
     "external_design": "外部設計",
+    "basic_design": "基本設計",
     "detailed_design": "詳細設計",
     "pg": "PG",
     "ut": "UT",

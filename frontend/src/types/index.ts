@@ -5,6 +5,7 @@ export type ProjectStatus = 'planning' | 'in_progress' | 'on_hold' | 'completed'
 export const TASK_TYPES = {
   requirements: '要件定義',
   external_design: '外部設計',
+  basic_design: '基本設計',
   detailed_design: '詳細設計',
   pg: 'PG',
   ut: 'UT',
