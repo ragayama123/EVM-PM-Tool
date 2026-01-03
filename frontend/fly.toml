@@ -9,6 +9,10 @@ primary_region = 'nrt'
 [build]
   dockerfile = 'Dockerfile.fly'
 
+[build.args]
+  VITE_SUPABASE_URL = "https://bqakzhvwvgvjqqtxfydi.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJxYWt6aHZ3dmd2anFxdHhmeWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1NzY5NTIsImV4cCI6MjA4MjE1Mjk1Mn0.elQw0hYV8DohtwB_JTxCKJkrsSiOT5KswQ2a3bcBh0w"
+
 [env]
   API_URL = 'https://wbs-evm-backend.fly.dev'
 

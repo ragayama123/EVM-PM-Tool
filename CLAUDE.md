@@ -102,3 +102,30 @@ npm run lint         # ESLintチェック
 **バックエンド:** Python 3.11+, FastAPI, SQLAlchemy（SQLite）, Pydantic
 
 **フロントエンド:** React 19 / TypeScript, Vite, TailwindCSS, React Query, Recharts, React Router, Lucide Icons
+
+## Fly.ioデプロイ
+
+### 重要: フロントエンドのデプロイ
+
+フロントエンドはViteでビルドするため、Supabase環境変数は**ビルド時**に必要。`fly secrets`はランタイム環境変数なのでビルド時には使えない。
+
+**正しい方法**: `frontend/fly.toml` の `[build.args]` に環境変数を設定済み
+```bash
+cd frontend
+fly deploy
+```
+
+**注意**: `fly.toml` にはSupabase認証情報が含まれているため、公開リポジトリにpushする場合は `.gitignore` に追加するか、値をプレースホルダーに置き換えること。
+
+### バックエンドのデプロイ
+
+```bash
+cd backend
+fly deploy
+```
+
+### デプロイ時のトラブルシューティング
+
+1. **画面が真っ白**: ブラウザのコンソールで `Missing Supabase environment variables` エラー → `fly.toml` の `[build.args]` を確認
+2. **変更が反映されない**: Depotビルダーのキャッシュ → `fly deploy --no-cache` を試す
+3. **古いバージョンが表示される**: ブラウザキャッシュ → ハードリロード（Cmd+Shift+R / Ctrl+Shift+R）

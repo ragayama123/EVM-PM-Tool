@@ -123,11 +123,19 @@ export const tasksApi = {
     if ((task as { is_milestone?: boolean }).is_milestone !== undefined) cleanedTask.is_milestone = (task as { is_milestone?: boolean }).is_milestone;
     if ((task as { task_type?: string }).task_type !== undefined) cleanedTask.task_type = (task as { task_type?: string }).task_type;
 
-    // 日付フィールドは空でなければISO形式で追加
-    if (task.planned_start_date) cleanedTask.planned_start_date = toDateTime(task.planned_start_date);
-    if (task.planned_end_date) cleanedTask.planned_end_date = toDateTime(task.planned_end_date);
-    if (task.actual_start_date) cleanedTask.actual_start_date = toDateTime(task.actual_start_date);
-    if (task.actual_end_date) cleanedTask.actual_end_date = toDateTime(task.actual_end_date);
+    // 日付フィールドは明示的にundefinedでない限りISO形式で追加（空文字の場合はnullを送信して削除）
+    if (task.planned_start_date !== undefined) {
+      cleanedTask.planned_start_date = task.planned_start_date ? toDateTime(task.planned_start_date) : null;
+    }
+    if (task.planned_end_date !== undefined) {
+      cleanedTask.planned_end_date = task.planned_end_date ? toDateTime(task.planned_end_date) : null;
+    }
+    if (task.actual_start_date !== undefined) {
+      cleanedTask.actual_start_date = task.actual_start_date ? toDateTime(task.actual_start_date) : null;
+    }
+    if (task.actual_end_date !== undefined) {
+      cleanedTask.actual_end_date = task.actual_end_date ? toDateTime(task.actual_end_date) : null;
+    }
 
     const { data } = await api.put(`/tasks/${id}`, cleanedTask);
     return data;

@@ -256,6 +256,63 @@ db.close()
 
 ### トラブルシューティング
 
+#### フロントエンドが真っ白になる（Supabase環境変数エラー）
+
+ブラウザの開発者ツール（F12）で以下のエラーが表示される場合:
+```
+Uncaught Error: Missing Supabase environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+```
+
+**原因**: フロントエンドのビルド時にSupabase環境変数が渡されていない
+
+**解決方法**: `frontend/fly.toml` に `[build.args]` セクションを追加:
+
+```toml
+[build]
+  dockerfile = 'Dockerfile.fly'
+
+[build.args]
+  VITE_SUPABASE_URL = "https://xxxxx.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "your-anon-key"
+```
+
+その後、再デプロイ:
+```bash
+cd frontend
+fly deploy
+```
+
+**補足**: `fly secrets` はランタイム環境変数のため、Viteのビルド時には使用できません。`[build.args]` または `--build-arg` でビルド時に渡す必要があります。
+
+#### Depotビルダーのキャッシュで変更が反映されない
+
+Fly.ioはDepotビルダーを使用しており、ビルドがキャッシュされることがあります。コード変更後にデプロイしても古いバージョンが表示される場合:
+
+**解決方法1**: `--no-cache` オプションを使用
+```bash
+fly deploy --no-cache
+```
+
+**解決方法2**: ローカルでビルドしてデプロイ
+```bash
+# ローカルでビルド
+npm run build
+
+# Dockerfile.flyを一時的に変更してdistを直接コピー
+# .dockerignoreからdist/を削除
+fly deploy
+```
+
+#### ブラウザキャッシュで古いバージョンが表示される
+
+デプロイ後も古いバージョンが表示される場合:
+
+**解決方法**: ハードリロードを実行
+- Windows/Linux: `Ctrl + Shift + R`
+- Mac: `Cmd + Shift + R`
+
+または、ブラウザの開発者ツール > Network タブ > 「Disable cache」をチェックしてリロード
+
 #### データベースマイグレーションエラー
 
 既存のデータベースでSupabase認証関連のエラーが発生した場合、以下のマイグレーションを実行:
