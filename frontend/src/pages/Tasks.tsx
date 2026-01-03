@@ -6,16 +6,18 @@ import type { Task, TaskCreate, ReschedulePreviewResponse, AutoSchedulePreviewRe
 import { TASK_TYPES, type TaskType } from '../types';
 
 // タスク種別のソート順序（デフォルト）
+// 要件定義 → 外部設計 → 基本設計 → 詳細設計 → PG → CI → UT → IT → ST → 本番化
 const TASK_TYPE_ORDER: Record<string, number> = {
   requirements: 0,
   external_design: 1,
-  detailed_design: 2,
-  pg: 3,
-  ci: 4,
-  ut: 5,
-  it: 6,
-  st: 7,
-  release: 8,
+  basic_design: 2,
+  detailed_design: 3,
+  pg: 4,
+  ci: 5,
+  ut: 6,
+  it: 7,
+  st: 8,
+  release: 9,
 };
 import { useProject } from '../contexts/ProjectContext';
 import { WBSImportModal } from '../components/WBSImportModal';
@@ -298,13 +300,6 @@ export function Tasks() {
     return member ? member.name : null;
   };
 
-  // タスクIDから名前を取得（先行タスク表示用）
-  const getTaskName = (taskId: number | undefined): string | null => {
-    if (!taskId || !tasks) return null;
-    const task = tasks.find(t => t.id === taskId);
-    return task ? task.name : null;
-  };
-
   // フェーズ（タスク種別）ごとのサマリーを計算
   type PhaseSummary = {
     taskType: string;
@@ -413,6 +408,11 @@ export function Tasks() {
     return task.planned_start_date || '\uffff'; // 未設定は最後に
   };
 
+  // 予定終了日でソート用の比較
+  const getPlannedEndDate = (task: Task): string => {
+    return task.planned_end_date || '\uffff'; // 未設定は最後に
+  };
+
   // 先行タスクを考慮したソート順序を計算
   const getPredecessorOrder = (task: Task, taskList: Task[]): number[] => {
     const order: number[] = [];
@@ -456,21 +456,22 @@ export function Tasks() {
 
     switch (sortType) {
       case 'default':
-        // ①種別 → ②先行/後行タスク → ③予定開始日 → ④担当者
+        // ①種別 → ②予定開始日 → ③予定終了日 → ④担当者
         sorted.sort((a, b) => {
           // ①種別
           const typeOrderA = getTaskTypeOrder(a.task_type);
           const typeOrderB = getTaskTypeOrder(b.task_type);
           if (typeOrderA !== typeOrderB) return typeOrderA - typeOrderB;
 
-          // ②先行/後行タスク
-          const predOrder = comparePredecessorOrder(a, b, taskList);
-          if (predOrder !== 0) return predOrder;
+          // ②予定開始日
+          const startA = getPlannedStartDate(a);
+          const startB = getPlannedStartDate(b);
+          if (startA !== startB) return startA.localeCompare(startB);
 
-          // ③予定開始日
-          const dateA = getPlannedStartDate(a);
-          const dateB = getPlannedStartDate(b);
-          if (dateA !== dateB) return dateA.localeCompare(dateB);
+          // ③予定終了日
+          const endA = getPlannedEndDate(a);
+          const endB = getPlannedEndDate(b);
+          if (endA !== endB) return endA.localeCompare(endB);
 
           // ④担当者（あいうえお順）
           const memberA = getMemberNameForSort(a.assigned_member_id);
@@ -1122,7 +1123,7 @@ export function Tasks() {
                     タスク名
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    先行タスク
+                    説明
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     種別
@@ -1206,8 +1207,8 @@ export function Tasks() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {getTaskName(task.predecessor_id) || '-'}
+                      <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate" title={task.description || ''}>
+                        {task.description || '-'}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm">
                         {task.task_type ? (
