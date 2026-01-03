@@ -96,6 +96,7 @@ export interface Task {
   hourly_rate: number;
   is_milestone: boolean;  // 固定日付タスク（リスケジュール対象外）
   task_type?: TaskType;   // タスク種別（フェーズ）
+  sort_order?: number;    // カスタム並び順
   // 予定スケジュール
   planned_start_date?: string;
   planned_end_date?: string;
@@ -297,7 +298,27 @@ export interface MemberUtilizationDetail {
 }
 
 // WBSソート種類
-export type WBSSortType = 'default' | 'assignee' | 'date';
+export type WBSSortType = 'default' | 'assignee' | 'date' | 'custom';
+
+// タスク並び順関連
+export interface TaskOrderItem {
+  task_id: number;
+  sort_order: number;
+}
+
+export interface TaskReorderRequest {
+  task_orders: TaskOrderItem[];
+}
+
+export interface TaskReorderResponse {
+  message: string;
+  updated_count: number;
+}
+
+export interface InitCustomOrderResponse {
+  message: string;
+  initialized_count: number;
+}
 
 // WBSインポート関連
 export interface WBSImportError {

@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
-import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM, MemberWithSkills, MemberUtilizationDetail, Holiday, HolidayCreate, HolidayImportItem, HolidayGenerateRequest, WorkingDaysInfo, HolidayType, ReschedulePreviewResponse, RescheduleResponse, AutoSchedulePreviewResponse, AutoScheduleResponse, WBSImportPreviewResponse, WBSImportResponse } from '../types';
+import type { Project, ProjectCreate, Task, TaskCreate, EVMMetrics, EVMSnapshot, EVMAnalysis, Member, MemberWithUtilization, MemberCreate, MemberEVM, MemberWithSkills, MemberUtilizationDetail, Holiday, HolidayCreate, HolidayImportItem, HolidayGenerateRequest, WorkingDaysInfo, HolidayType, ReschedulePreviewResponse, RescheduleResponse, AutoSchedulePreviewResponse, AutoScheduleResponse, WBSImportPreviewResponse, WBSImportResponse, TaskOrderItem, TaskReorderResponse, InitCustomOrderResponse } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -203,6 +203,18 @@ export const tasksApi = {
     formData.append('file', file);
     const { data } = await api.post(`/tasks/project/${projectId}/import-excel`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+
+  initCustomOrder: async (projectId: number): Promise<InitCustomOrderResponse> => {
+    const { data } = await api.post(`/tasks/project/${projectId}/init-custom-order`);
+    return data;
+  },
+
+  reorderTasks: async (projectId: number, taskOrders: TaskOrderItem[]): Promise<TaskReorderResponse> => {
+    const { data } = await api.post(`/tasks/project/${projectId}/reorder`, {
+      task_orders: taskOrders,
     });
     return data;
   },

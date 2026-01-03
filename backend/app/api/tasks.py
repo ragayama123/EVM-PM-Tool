@@ -20,6 +20,9 @@ from app.schemas.task import (
     AutoScheduleResponse,
     WBSImportPreviewResponse,
     WBSImportResponse,
+    TaskReorderRequest,
+    TaskReorderResponse,
+    InitCustomOrderResponse,
 )
 from app.services.reschedule import RescheduleService
 from app.services.auto_schedule import AutoScheduleService
@@ -426,3 +429,96 @@ async def execute_wbs_import(
         update_project_status(db, project_id)
 
     return result
+
+
+# デフォルトソートのための定数（フロントエンドと同期）
+TASK_TYPE_ORDER = {
+    'requirements': 0,
+    'external_design': 1,
+    'basic_design': 2,
+    'detailed_design': 3,
+    'pg': 4,
+    'ci': 5,
+    'ut': 6,
+    'it': 7,
+    'st': 8,
+    'release': 9,
+}
+
+
+@router.post("/project/{project_id}/init-custom-order", response_model=InitCustomOrderResponse)
+def init_custom_order(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    カスタム順の初期化
+    現在のデフォルトソート順（種別 → 予定開始日 → 予定終了日 → 担当者）で
+    sort_order を採番して保存
+    """
+    # プロジェクト存在確認
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+
+    tasks = db.query(Task).filter(Task.project_id == project_id).all()
+
+    if not tasks:
+        return {"message": "タスクがありません", "initialized_count": 0}
+
+    # デフォルト順でソート
+    def sort_key(task):
+        task_type_order = TASK_TYPE_ORDER.get(task.task_type, 999) if task.task_type else 999
+        planned_start = task.planned_start_date or "9999-12-31"
+        planned_end = task.planned_end_date or "9999-12-31"
+        member_id = task.assigned_member_id or 999999
+        return (task_type_order, planned_start, planned_end, member_id)
+
+    sorted_tasks = sorted(tasks, key=sort_key)
+
+    # sort_order を採番
+    for index, task in enumerate(sorted_tasks):
+        task.sort_order = index
+
+    db.commit()
+
+    return {
+        "message": f"カスタム順を初期化しました",
+        "initialized_count": len(sorted_tasks)
+    }
+
+
+@router.post("/project/{project_id}/reorder", response_model=TaskReorderResponse)
+def reorder_tasks(
+    project_id: int,
+    request: TaskReorderRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    タスクの並び順を一括更新
+    ドラッグ＆ドロップ操作後に呼び出される
+    """
+    # プロジェクト存在確認
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="プロジェクトが見つかりません")
+
+    updated_count = 0
+    for order_item in request.task_orders:
+        task = db.query(Task).filter(
+            Task.id == order_item.task_id,
+            Task.project_id == project_id
+        ).first()
+
+        if task:
+            task.sort_order = order_item.sort_order
+            updated_count += 1
+
+    db.commit()
+
+    return {
+        "message": f"{updated_count}件のタスクの並び順を更新しました",
+        "updated_count": updated_count
+    }

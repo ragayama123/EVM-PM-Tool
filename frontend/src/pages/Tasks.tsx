@@ -1,9 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { projectsApi, tasksApi, membersApi } from '../api/client';
-import { ListTodo, Plus, Trash2, Pencil, User, Calendar, X, Flag, Zap, FileSpreadsheet, ArrowUpDown } from 'lucide-react';
-import type { Task, TaskCreate, ReschedulePreviewResponse, AutoSchedulePreviewResponse, WBSSortType } from '../types';
+import { ListTodo, Plus, Trash2, Pencil, User, Calendar, X, Flag, Zap, FileSpreadsheet, ArrowUpDown, GripVertical } from 'lucide-react';
+import type { Task, TaskCreate, ReschedulePreviewResponse, AutoSchedulePreviewResponse, WBSSortType, TaskOrderItem } from '../types';
 import { TASK_TYPES, type TaskType } from '../types';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // タスク種別のソート順序（デフォルト）
 // 要件定義 → 外部設計 → 基本設計 → 詳細設計 → PG → CI → UT → IT → ST → 本番化
@@ -21,6 +38,207 @@ const TASK_TYPE_ORDER: Record<string, number> = {
 };
 import { useProject } from '../contexts/ProjectContext';
 import { WBSImportModal } from '../components/WBSImportModal';
+
+// ドラッグ可能なテーブル行コンポーネント
+interface SortableRowProps {
+  task: Task;
+  isDraggable: boolean;
+  autoScheduleMode: boolean;
+  rescheduleMode: boolean;
+  selectedTasksForAutoSchedule: number[];
+  selectedTaskForReschedule: Task | null;
+  onToggleAutoSchedule: (taskId: number) => void;
+  onRescheduleSelect: (task: Task) => void;
+  getMemberName: (memberId: number | undefined) => string | null;
+  onEdit: (task: Task) => void;
+  onDelete: (taskId: number) => void;
+}
+
+function SortableRow({
+  task,
+  isDraggable,
+  autoScheduleMode,
+  rescheduleMode,
+  selectedTasksForAutoSchedule,
+  selectedTaskForReschedule,
+  onToggleAutoSchedule,
+  onRescheduleSelect,
+  getMemberName,
+  onEdit,
+  onDelete,
+}: SortableRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id, disabled: !isDraggable });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const isEligibleForAutoSchedule = task.task_type;
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      onClick={() => {
+        if (rescheduleMode && task.planned_start_date && !task.is_milestone) {
+          onRescheduleSelect(task);
+        }
+      }}
+      className={`
+        hover:bg-gray-50 dark:hover:bg-gray-700
+        ${rescheduleMode && task.planned_start_date && !task.is_milestone ? 'cursor-pointer' : ''}
+        ${selectedTaskForReschedule?.id === task.id ? 'bg-orange-100 dark:bg-orange-900/30' : ''}
+        ${rescheduleMode && (!task.planned_start_date || task.is_milestone) ? 'opacity-50' : ''}
+        ${autoScheduleMode && selectedTasksForAutoSchedule.includes(task.id) ? 'bg-purple-100 dark:bg-purple-900/30' : ''}
+        ${autoScheduleMode && !isEligibleForAutoSchedule ? 'opacity-50' : ''}
+        ${isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : ''}
+      `}
+    >
+      {/* ドラッグハンドル */}
+      {isDraggable && (
+        <td className="px-2 py-4 whitespace-nowrap">
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
+        </td>
+      )}
+      {autoScheduleMode && (
+        <td className="px-2 py-4 whitespace-nowrap text-center">
+          <input
+            type="checkbox"
+            checked={selectedTasksForAutoSchedule.includes(task.id)}
+            onChange={() => onToggleAutoSchedule(task.id)}
+            disabled={!isEligibleForAutoSchedule}
+            className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500 disabled:opacity-50"
+          />
+        </td>
+      )}
+      <td className="px-4 py-4 whitespace-nowrap">
+        <div className="flex items-center gap-2">
+          {task.is_milestone ? (
+            <Flag className="w-4 h-4 text-orange-500" />
+          ) : (
+            <ListTodo className="w-4 h-4 text-gray-400" />
+          )}
+          <span className={`font-medium ${task.is_milestone ? 'text-orange-600 dark:text-orange-400' : 'text-gray-900 dark:text-white'}`}>
+            {task.name}
+          </span>
+          {task.is_milestone && (
+            <span className="text-xs px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded">
+              固定
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate" title={task.description || ''}>
+        {task.description || '-'}
+      </td>
+      <td className="px-4 py-4 whitespace-nowrap text-sm">
+        {task.task_type ? (
+          <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded">
+            {TASK_TYPES[task.task_type as TaskType] || task.task_type}
+          </span>
+        ) : (
+          <span className="text-gray-400 dark:text-gray-500">-</span>
+        )}
+      </td>
+      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+        {getMemberName(task.assigned_member_id) ? (
+          <div className="flex items-center gap-1">
+            <User className="w-4 h-4 text-gray-400" />
+            <span>{getMemberName(task.assigned_member_id)}</span>
+          </div>
+        ) : (
+          <span className="text-gray-400 dark:text-gray-500">-</span>
+        )}
+      </td>
+      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+        {task.planned_start_date && task.planned_end_date ? (
+          <div className="text-xs">
+            <div>{new Date(task.planned_start_date).toLocaleDateString('ja-JP')}</div>
+            <div className="text-gray-400 dark:text-gray-500">〜</div>
+            <div>{new Date(task.planned_end_date).toLocaleDateString('ja-JP')}</div>
+          </div>
+        ) : (
+          <span className="text-gray-400 dark:text-gray-500">-</span>
+        )}
+      </td>
+      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+        {task.actual_start_date || task.actual_end_date ? (
+          <div className="text-xs">
+            <div>{task.actual_start_date ? new Date(task.actual_start_date).toLocaleDateString('ja-JP') : '-'}</div>
+            <div className="text-gray-400 dark:text-gray-500">〜</div>
+            <div>{task.actual_end_date ? new Date(task.actual_end_date).toLocaleDateString('ja-JP') : '-'}</div>
+          </div>
+        ) : (
+          <span className="text-gray-400 dark:text-gray-500">-</span>
+        )}
+      </td>
+      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+        {task.planned_hours}h
+      </td>
+      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+        {task.actual_hours}h
+      </td>
+      <td className="px-4 py-4 whitespace-nowrap">
+        <div className="flex items-center gap-2">
+          <div className="w-20 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+            <div
+              className={`h-2 rounded-full ${
+                task.progress >= 100 ? 'bg-green-500' :
+                task.progress >= 50 ? 'bg-blue-500' :
+                task.progress > 0 ? 'bg-yellow-500' : 'bg-gray-300'
+              }`}
+              style={{ width: `${Math.min(task.progress, 100)}%` }}
+            />
+          </div>
+          <span className="text-sm text-gray-500 dark:text-gray-400 w-12">
+            {task.progress}%
+          </span>
+        </div>
+      </td>
+      <td className="px-4 py-4 whitespace-nowrap text-right">
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(task);
+            }}
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+            title="編集"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (confirm('このタスクを削除しますか？')) {
+                onDelete(task.id);
+              }
+            }}
+            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+            title="削除"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
 
 // 日付文字列をYYYY-MM-DD形式に変換するヘルパー
 const toDateInput = (dateStr: string | undefined | null): string => {
@@ -72,6 +290,39 @@ export function Tasks() {
 
   // ソート設定
   const [sortType, setSortType] = useState<WBSSortType>('default');
+  const [isInitializingCustomOrder, setIsInitializingCustomOrder] = useState(false);
+
+  // dnd-kit センサー設定
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // カスタム順初期化mutation
+  const initCustomOrderMutation = useMutation({
+    mutationFn: () => tasksApi.initCustomOrder(selectedProjectId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
+      setIsInitializingCustomOrder(false);
+    },
+    onError: () => {
+      setIsInitializingCustomOrder(false);
+    },
+  });
+
+  // 並び順更新mutation
+  const reorderMutation = useMutation({
+    mutationFn: (taskOrders: TaskOrderItem[]) => tasksApi.reorderTasks(selectedProjectId!, taskOrders),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', selectedProjectId] });
+    },
+  });
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -528,6 +779,15 @@ export function Tasks() {
           return memberA.localeCompare(memberB, 'ja');
         });
         break;
+
+      case 'custom':
+        // sort_order でソート（nullは最後に）
+        sorted.sort((a, b) => {
+          const orderA = a.sort_order ?? Number.MAX_SAFE_INTEGER;
+          const orderB = b.sort_order ?? Number.MAX_SAFE_INTEGER;
+          return orderA - orderB;
+        });
+        break;
     }
 
     return sorted;
@@ -535,6 +795,46 @@ export function Tasks() {
 
   // タスクをソートして返す（フラット表示）
   const sortedTasks = sortTasks(tasks || []);
+
+  // ソートタイプ変更ハンドラー（カスタム順選択時に初期化）
+  const handleSortTypeChange = async (newSortType: WBSSortType) => {
+    if (newSortType === 'custom' && selectedProjectId) {
+      // カスタム順を選択した場合、sort_orderが未設定なら初期化
+      const hasNoSortOrder = tasks?.every(t => t.sort_order === null || t.sort_order === undefined);
+      if (hasNoSortOrder) {
+        setIsInitializingCustomOrder(true);
+        initCustomOrderMutation.mutate();
+      }
+    }
+    setSortType(newSortType);
+  };
+
+  // ドラッグ終了ハンドラー
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = sortedTasks.findIndex((t) => t.id === active.id);
+      const newIndex = sortedTasks.findIndex((t) => t.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        // 新しい順序を計算
+        const newSortedTasks = arrayMove(sortedTasks, oldIndex, newIndex);
+
+        // sort_order を更新
+        const taskOrders: TaskOrderItem[] = newSortedTasks.map((task, index) => ({
+          task_id: task.id,
+          sort_order: index,
+        }));
+
+        // バックエンドに保存
+        reorderMutation.mutate(taskOrders);
+      }
+    }
+  };
+
+  // ソート済みタスクIDの配列（dnd-kit用）
+  const taskIds = useMemo(() => sortedTasks.map((t) => t.id), [sortedTasks]);
 
   // 最初のプロジェクトを自動選択
   if (projects && projects.length > 0 && !selectedProjectId) {
@@ -639,15 +939,27 @@ export function Tasks() {
                 <ArrowUpDown className="w-4 h-4 inline mr-1" />
                 並び順
               </label>
-              <select
-                value={sortType}
-                onChange={(e) => setSortType(e.target.value as WBSSortType)}
-                className="w-full md:w-48 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="default">デフォルト（種別順）</option>
-                <option value="assignee">担当者順</option>
-                <option value="date">日付順</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  value={sortType}
+                  onChange={(e) => handleSortTypeChange(e.target.value as WBSSortType)}
+                  disabled={isInitializingCustomOrder}
+                  className="w-full md:w-48 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50"
+                >
+                  <option value="default">デフォルト（種別順）</option>
+                  <option value="assignee">担当者順</option>
+                  <option value="date">日付順</option>
+                  <option value="custom">カスタム順</option>
+                </select>
+                {isInitializingCustomOrder && (
+                  <span className="text-sm text-gray-500 dark:text-gray-400">初期化中...</span>
+                )}
+                {sortType === 'custom' && (
+                  <span className="text-xs text-blue-600 dark:text-blue-400">
+                    ドラッグで並び替え可能
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1104,212 +1416,104 @@ export function Tasks() {
 
       {/* タスク一覧 */}
       {selectedProjectId && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  {autoScheduleMode && (
-                    <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-10">
-                      <input
-                        type="checkbox"
-                        checked={tasks && selectedTasksForAutoSchedule.length === tasks.filter(t => t.task_type).length && selectedTasksForAutoSchedule.length > 0}
-                        onChange={toggleAllTasksForAutoSchedule}
-                        className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500"
-                      />
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    {sortType === 'custom' && (
+                      <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-10">
+                        {/* ドラッグハンドル用 */}
+                      </th>
+                    )}
+                    {autoScheduleMode && (
+                      <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-10">
+                        <input
+                          type="checkbox"
+                          checked={tasks && selectedTasksForAutoSchedule.length === tasks.filter(t => t.task_type).length && selectedTasksForAutoSchedule.length > 0}
+                          onChange={toggleAllTasksForAutoSchedule}
+                          className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500"
+                        />
+                      </th>
+                    )}
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      タスク名
                     </th>
-                  )}
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    タスク名
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    説明
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    種別
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    担当者
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    予定期間
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    実績期間
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    予定工数
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    実績工数
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    進捗率
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    操作
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {tasksLoading ? (
-                  <tr>
-                    <td colSpan={autoScheduleMode ? 11 : 10} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                      読み込み中...
-                    </td>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      説明
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      種別
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      担当者
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      予定期間
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      実績期間
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      予定工数
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      実績工数
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      進捗率
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      操作
+                    </th>
                   </tr>
-                ) : sortedTasks.length > 0 ? (
-                  sortedTasks.map((task) => {
-                    const isEligibleForAutoSchedule = task.task_type;
-                    return (
-                    <tr
-                      key={task.id}
-                      onClick={() => {
-                        if (rescheduleMode && task.planned_start_date && !task.is_milestone) {
-                          setSelectedTaskForReschedule(task);
-                          setRescheduleError(null);
-                        }
-                      }}
-                      className={`
-                        hover:bg-gray-50 dark:hover:bg-gray-700
-                        ${rescheduleMode && task.planned_start_date && !task.is_milestone ? 'cursor-pointer' : ''}
-                        ${selectedTaskForReschedule?.id === task.id ? 'bg-orange-100 dark:bg-orange-900/30' : ''}
-                        ${rescheduleMode && (!task.planned_start_date || task.is_milestone) ? 'opacity-50' : ''}
-                        ${autoScheduleMode && selectedTasksForAutoSchedule.includes(task.id) ? 'bg-purple-100 dark:bg-purple-900/30' : ''}
-                        ${autoScheduleMode && !isEligibleForAutoSchedule ? 'opacity-50' : ''}
-                      `}
-                    >
-                      {autoScheduleMode && (
-                        <td className="px-2 py-4 whitespace-nowrap text-center">
-                          <input
-                            type="checkbox"
-                            checked={selectedTasksForAutoSchedule.includes(task.id)}
-                            onChange={() => toggleTaskForAutoSchedule(task.id)}
-                            disabled={!isEligibleForAutoSchedule}
-                            className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500 disabled:opacity-50"
-                          />
+                </thead>
+                <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {tasksLoading ? (
+                      <tr>
+                        <td colSpan={sortType === 'custom' ? 12 : (autoScheduleMode ? 11 : 10)} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                          読み込み中...
                         </td>
-                      )}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          {task.is_milestone ? (
-                            <Flag className="w-4 h-4 text-orange-500" />
-                          ) : (
-                            <ListTodo className="w-4 h-4 text-gray-400" />
-                          )}
-                          <span className={`font-medium ${task.is_milestone ? 'text-orange-600 dark:text-orange-400' : 'text-gray-900 dark:text-white'}`}>
-                            {task.name}
-                          </span>
-                          {task.is_milestone && (
-                            <span className="text-xs px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded">
-                              固定
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate" title={task.description || ''}>
-                        {task.description || '-'}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm">
-                        {task.task_type ? (
-                          <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded">
-                            {TASK_TYPES[task.task_type as TaskType] || task.task_type}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 dark:text-gray-500">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {getMemberName(task.assigned_member_id) ? (
-                          <div className="flex items-center gap-1">
-                            <User className="w-4 h-4 text-gray-400" />
-                            <span>{getMemberName(task.assigned_member_id)}</span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 dark:text-gray-500">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {task.planned_start_date && task.planned_end_date ? (
-                          <div className="text-xs">
-                            <div>{new Date(task.planned_start_date).toLocaleDateString('ja-JP')}</div>
-                            <div className="text-gray-400 dark:text-gray-500">〜</div>
-                            <div>{new Date(task.planned_end_date).toLocaleDateString('ja-JP')}</div>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 dark:text-gray-500">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {task.actual_start_date || task.actual_end_date ? (
-                          <div className="text-xs">
-                            <div>{task.actual_start_date ? new Date(task.actual_start_date).toLocaleDateString('ja-JP') : '-'}</div>
-                            <div className="text-gray-400 dark:text-gray-500">〜</div>
-                            <div>{task.actual_end_date ? new Date(task.actual_end_date).toLocaleDateString('ja-JP') : '-'}</div>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 dark:text-gray-500">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {task.planned_hours}h
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {task.actual_hours}h
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <div className="w-20 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
-                            <div
-                              className={`h-2 rounded-full ${
-                                task.progress >= 100 ? 'bg-green-500' :
-                                task.progress >= 50 ? 'bg-blue-500' :
-                                task.progress > 0 ? 'bg-yellow-500' : 'bg-gray-300'
-                              }`}
-                              style={{ width: `${Math.min(task.progress, 100)}%` }}
-                            />
-                          </div>
-                          <span className="text-sm text-gray-500 dark:text-gray-400 w-12">
-                            {task.progress}%
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleEdit(task)}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                            title="編集"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (confirm('このタスクを削除しますか？')) {
-                                deleteMutation.mutate(task.id);
-                              }
-                            }}
-                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-                            title="削除"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={autoScheduleMode ? 11 : 10} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                      タスクがありません
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      </tr>
+                    ) : sortedTasks.length > 0 ? (
+                      sortedTasks.map((task) => (
+                        <SortableRow
+                          key={task.id}
+                          task={task}
+                          isDraggable={sortType === 'custom'}
+                          autoScheduleMode={autoScheduleMode}
+                          rescheduleMode={rescheduleMode}
+                          selectedTasksForAutoSchedule={selectedTasksForAutoSchedule}
+                          selectedTaskForReschedule={selectedTaskForReschedule}
+                          onToggleAutoSchedule={toggleTaskForAutoSchedule}
+                          onRescheduleSelect={(t) => {
+                            setSelectedTaskForReschedule(t);
+                            setRescheduleError(null);
+                          }}
+                          getMemberName={getMemberName}
+                          onEdit={handleEdit}
+                          onDelete={(id) => deleteMutation.mutate(id)}
+                        />
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={sortType === 'custom' ? 12 : (autoScheduleMode ? 11 : 10)} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                          タスクがありません
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </SortableContext>
+              </table>
+            </div>
           </div>
-        </div>
+        </DndContext>
       )}
 
       {/* リスケジュールプレビューモーダル */}

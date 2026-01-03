@@ -12,6 +12,7 @@ class TaskBase(BaseModel):
     hourly_rate: float = 0
     is_milestone: bool = False  # 固定日付タスク（リスケジュール対象外）
     task_type: Optional[str] = None  # タスク種別（フェーズ）
+    sort_order: Optional[int] = None  # カスタム並び順
     # 予定スケジュール
     planned_start_date: Optional[datetime] = None
     planned_end_date: Optional[datetime] = None
@@ -38,6 +39,7 @@ class TaskUpdate(BaseModel):
     hourly_rate: Optional[float] = None
     is_milestone: Optional[bool] = None  # 固定日付タスク
     task_type: Optional[str] = None  # タスク種別（フェーズ）
+    sort_order: Optional[int] = None  # カスタム並び順
     planned_start_date: Optional[datetime] = None
     planned_end_date: Optional[datetime] = None
     actual_start_date: Optional[datetime] = None
@@ -188,3 +190,27 @@ class WBSImportResponse(BaseModel):
     message: str
     errors: List[WBSImportError]
     imported_count: int
+
+
+# タスク並び順関連スキーマ
+class TaskOrderItem(BaseModel):
+    """並び順更新用の個別タスク"""
+    task_id: int
+    sort_order: int
+
+
+class TaskReorderRequest(BaseModel):
+    """並び順一括更新リクエスト"""
+    task_orders: List[TaskOrderItem]
+
+
+class TaskReorderResponse(BaseModel):
+    """並び順更新結果"""
+    message: str
+    updated_count: int
+
+
+class InitCustomOrderResponse(BaseModel):
+    """カスタム順初期化結果"""
+    message: str
+    initialized_count: int

@@ -32,6 +32,9 @@ class Task(Base):
     # タスク種別（フェーズ）
     task_type = Column(String, nullable=True)
 
+    # カスタム並び順
+    sort_order = Column(Integer, nullable=True)
+
     # 予定スケジュール
     planned_start_date = Column(DateTime(timezone=True), nullable=True)
     planned_end_date = Column(DateTime(timezone=True), nullable=True)
